@@ -1,14 +1,14 @@
-"""The scores and probes the experiments share, so that every script scores the coordinates the same way.
-    error, error_r2     the paper's error statistic (half the central 68 per cent range of the differences), and it with R^2 per label
-    linear_probe_r2     R^2 of the affine map coordinates -> labels fitted on all stars (the linear map of Section 3.1)
-    quadratic_map, design   polynomial maps of the standardised coordinates (the quadratic map of Section 3.1)
-    pair_jitter         the separation of the two coordinates of a star observed twice (Section 3.2, survey_precision.py)
-    labelled_pool       the random draw of the training set (survey_ladder.py --draw random, survey_competitors.py)
-    window_giants_split, score_held, alpha_trend   the protocol and score of the sweeps and the degradation ladder
-    two_gaussians, separation   a two-Gaussian fit and its separation D (the two alpha sequences, Section 4 and Figure 11)
-    ridge_probe_r2      the split-half ridge probe of survey_coordinates.py
-    grid_step_lengths, line_monotonicity, orientation_consistency, factorial_index, grid_neighbour_pairs, euclidean_metric   the synthetic-grid tests of Section 2.7
-    local_linear, pick_kmedoids, fewshot, affine_r2_between, standardise   the side scores of the ten-thousand-star sweeps (competitor_sweep.py, autoencoder.py), kept as their record
+"""The scores and probes used to judge coordinates and transferred labels, so that every analysis scores them the same way.
+    error, error_r2     the error statistic (half the central 68 per cent range of the differences), and it with R^2 per label
+    linear_probe_r2     R^2 of the affine map coordinates -> labels fitted on all stars
+    quadratic_map, design   polynomial maps of the standardised coordinates
+    pair_jitter         the separation of the two coordinates of a star observed twice
+    labelled_pool       a random draw of the training set: every labelled star in one random order
+    window_giants_split, score_held, alpha_trend   a held-out scoring protocol on the giants of a metallicity window, and the running trend of [alpha/M]
+    two_gaussians, separation   a two-Gaussian fit and its separation D (Ashman's D; two alpha sequences)
+    ridge_probe_r2      the split-half ridge probe: labels regressed on the coordinates, fitted on one half, scored on the other
+    grid_step_lengths, line_monotonicity, orientation_consistency, factorial_index, grid_neighbour_pairs, euclidean_metric   the tests on a synthetic label grid
+    local_linear, pick_kmedoids, fewshot, affine_r2_between, standardise   side scores: a local linear read-out of labels from coordinates, a label-free choice of training stars, and their few-shot ladder
     tolist              JSON-ready copies
 """
 import numpy as np
@@ -20,9 +20,9 @@ LAB = ["Teff", "logg", "[Fe/H]", "[a/M]"]
 
 
 def error(e, axis=0):
-    """The paper's error statistic: half the width of the central 68 per cent of the differences e (the 16th to 84th
+    """The error statistic: half the width of the central 68 per cent of the differences e (the 16th to 84th
     percentile range over two), the width of a Gaussian of the same core, insensitive to the few stars a graph places
-    wrongly.  Section 3.2 defines it once; every quoted error, figure annotation and score uses this function."""
+    wrongly.  Every quoted error and score uses this function."""
     e = np.asarray(e, float); lo, hi = np.nanpercentile(e, [16, 84], axis=axis); return (hi - lo) / 2
 
 
@@ -108,13 +108,13 @@ def alpha_trend(Yg):
 
 
 def labelled_pool(has_label, seed=0):
-    """The label ladder's draw (survey_ladder.py, survey_competitors.py): every labelled star in one random order, so that
+    """A random draw of the training set: every labelled star in one random order, so that
     the n training stars are pool[:n] and every other labelled star, pool[n:], is scored."""
     return np.random.default_rng(seed).permutation(np.where(np.asarray(has_label, bool))[0])
 
 
 def window_giants_split(Y, has_label, test_frac=0.25, seed=0, window=(-0.9, -0.2)):
-    """The scoring protocol of the sweeps, the scaling run and the degradation ladder (survey_sweep.py, survey_scaling.py, survey_degrade.py):
+    """A held-out scoring protocol on the giants of a metallicity window:
     giants = labelled, log g < 3.5, finite [alpha/M]; window giants = giants with window[0] < [Fe/H] < window[1];
     held = a random test_frac of the window giants, reserved before any training star is drawn; pool = the other
     labelled stars in random order, so that the training set of n is pool[:n] (nested draws).
@@ -216,7 +216,7 @@ def grid_step_lengths(D, grid_index, lookup, regions):
 
 
 def line_monotonicity(C, lab):
-    """The lattice test of Section 3: along every grid line (one label varying, the other two fixed) the
+    """The lattice test on a label grid: along every grid line (one label varying, the other two fixed) the
     absolute Spearman correlation between position along the line's principal axis in the coordinates and the
     grid order; the mean, the fraction of perfectly monotonic lines, and the mean per axis."""
     uniq_, lookup_ = factorial_index(lab); vals = {0: [], 1: [], 2: []}

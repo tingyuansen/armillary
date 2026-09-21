@@ -1,6 +1,6 @@
-"""The whole chain of Section 2 as one function, fit(flux, good, segments, config), with a Config dataclass
-and a Fit object holding every intermediate product, the timings of every step, and the label transfer
-of Section 2.5 as Fit.propagate().  The same implementation is used at every sample size (Section 2.6)."""
+"""The whole chain as one function, fit(flux, good, segments, config), with a Config dataclass and a Fit object holding
+every intermediate product, the timings of every step, and the label transfer as Fit.propagate().  The same implementation
+is used at every sample size."""
 import time, json, dataclasses
 from dataclasses import dataclass, field
 import numpy as np
@@ -10,33 +10,33 @@ from . import preprocess as pp, distance as dm, lattice as lm, coordinates as cm
 
 @dataclass
 class Config:
-    """Every parameter of Section 2, with the paper's APOGEE values as defaults."""
-    # --- preprocessing (Section 2.1, "the flux divided by a locally fitted continuum")
+    """Every parameter of the method, with the values of the APOGEE runs of Ting & Saad (2026) as defaults."""
+    # --- preprocessing: the flux divided by a locally fitted continuum
     continuum: str = "none"            # "none" (pipeline-normalised input, APOGEE) | "running" (preprocess.prepare, DESI type)
     window_px: int = 100               # running continuum window (continuum="running")
     continuum_q: float = 0.90          # its upper quantile
     min_cover: float = 0.9             # common pixel cut of prepare (fraction of stars a pixel must be good in)
     renorm_chunking: tuple = (8, 7, 5) # the chunking whose chunks the local straight-line continuum is fitted in
     renorm_q: float = 0.85             # its upper quantile
-    # --- the distance (Section 2.1)
+    # --- the distance
     chunkings: tuple = ((4, 4, 3), (8, 7, 5), (16, 14, 10))   # chunks per detector segment, coarse to fine
-    error_weights: bool = False        # weight each pixel's depth by its inverse variance in the curves: True where the errors carry structure of their own (DESI, sky and detector), False where they follow the photon noise (APOGEE; Section 5.4)
+    error_weights: bool = False        # weight each pixel's depth by its inverse variance in the curves: True where the errors carry structure of their own (DESI, sky and detector), False where they follow the photon noise (APOGEE)
     n_ref: int = 500                   # stars whose pairs give the median W1 of every chunk (n_ref (n_ref-1)/2 pairs)
-    # --- the neighbour graph (Section 2.2; the code's lattice)
+    # --- the neighbour graph (the code's lattice)
     k_lattice: int = 30
     search: str = "exact"              # "exact" | "nndescent"
     n_landmarks: int = None            # landmarks for the geodesics and the scaling; None: every star
-    # --- the coordinates (Section 2.3)
+    # --- the coordinates
     d: int = 4
     n_eig: int = 12                    # eigenvalues returned, to read the number of coordinates from
-    # --- the refinement (Section 2.4)
-    n_pca: int = 30                    # the projection the weights are fitted on: this many principal components of the normalised flux, bad pixels at the pixel's sample mean (the sweep of 3.1)
+    # --- the refinement
+    n_pca: int = 30                    # the projection the weights are fitted on: this many principal components of the normalised flux, bad pixels at the pixel's sample mean
     pca_fit_max: int = 30000           # the components are fitted on this many stars drawn at random and applied to all
-    k_refine: int = 100                # neighbours under D of the one weight matrix W (100 on the 4,000-star cube and at survey scale, the sweep of 3.1)
+    k_refine: int = 100                # neighbours under D of the one weight matrix W (100 on the 4,000-star test cube and at survey scale)
     reg: float = 1e-3                  # ridge on the local Gram matrix, x trace(G)
-    rho: float = 0.003                 # anchor strength of eq. (solve), relative to tr[(I-W)^T(I-W)]/N; the label-free minimum of the pair separation, experiments/survey_precision.py --rhos
-    # --- the transfer (Section 2.5): the same W as the refinement
-    k_prop: int = None                 # None: k_refine, and the refinement's W is reused (the paper); a value builds a second W over that many neighbours (the sweep of survey_sweep.py)
+    rho: float = 0.003                 # anchor strength of the refinement, relative to tr[(I-W)^T(I-W)]/N; chosen without labels, at the minimum of the separation of repeat observations of the same star
+    # --- the transfer: the same W as the refinement
+    k_prop: int = None                 # None: k_refine, and the refinement's W is reused; a value builds a second W over that many neighbours
     mu: float = 1.0
     # --- implementation
     seed: int = 0
@@ -62,23 +62,23 @@ class Config:
 
     def save(self, path): json.dump(self.to_dict(), open(path, "w"), indent=1)
 
-    # ---- the configurations the paper's runs use
+    # ---- the configurations of the published runs
     @property
     def k_prop_eff(self): return self.k_refine if self.k_prop is None else self.k_prop
 
     @classmethod
     def paper_apogee(cls, **kw):
-        """The 4,000-star APOGEE cube of the tests (data/make_apogee_cube.py): one weight matrix over k_refine = k_prop = 100 neighbours under D, mu 1."""
+        """The 4,000-star APOGEE test cube: one weight matrix over k_refine = k_prop = 100 neighbours under D, mu 1."""
         return cls(**kw)
 
     @classmethod
     def paper_apogee_survey(cls, **kw):
-        """The survey-scale APOGEE chain (Section 3): 800 landmarks, one weight matrix over k_refine = k_prop = 100 neighbours under D, mu 3."""
+        """The survey-scale APOGEE chain: 800 landmarks, one weight matrix over k_refine = k_prop = 100 neighbours under D, mu 3."""
         d = dict(n_landmarks=800, k_refine=100, k_prop=None, mu=3.0, search="nndescent"); d.update(kw); return cls(**d)
 
     @classmethod
     def paper_desi(cls, **kw):
-        """The DESI chain (Section 4): running continuum (window 100 px, q 0.90), local renormalisation in (10, 6, 4),
+        """The DESI chain: running continuum (window 100 px, q 0.90), local renormalisation in (10, 6, 4),
         the depth weighted by the pixel's inverse variance (the errors carry sky and detector structure), four chunkings,
         800 landmarks, one weight matrix over k_refine = k_prop = 100 (APOGEE's setting, which DESI's sweep cannot separate from 200 or 400), mu 3."""
         d = dict(continuum="running", window_px=100, continuum_q=0.90, min_cover=0.9, renorm_chunking=(10, 6, 4), error_weights=True,
@@ -87,7 +87,7 @@ class Config:
 
     @classmethod
     def paper_synthetic(cls, **kw):
-        """Section 3: one segment, one chunking of 32 chunks, d = 3, k_refine 50, the local continuum fitted in
+        """The synthetic grid: one segment, one chunking of 32 chunks, d = 3, k_refine 50, the local continuum fitted in
         the same 32 chunks (the synthetic spectra are already normalised; the fit changes little)."""
         d = dict(chunkings=((32,),), renorm_chunking=(32,), d=3, k_refine=50); d.update(kw); return cls(**d)
 
@@ -105,10 +105,10 @@ class Fit:
     Methods: propagate(labels, labelled_index, ...), save(path)."""
     def __init__(self, config): self.config = config; self.timings = {}; self.log_lines = []; self._Wprop = {}
 
-    # ---- Section 2.5
+    # ---- the transfer
     def propagation_weights(self, k_prop=None):
-        """W for the transfer: the refinement's W (k_prop None or equal to k_refine: the paper's one weight matrix), else a
-        second matrix over k_prop neighbours under D by the same rule (the sweep of survey_sweep.py)."""
+        """W for the transfer: the refinement's W (k_prop None or equal to k_refine: the one weight matrix), else a
+        second matrix over k_prop neighbours under D by the same rule."""
         c = self.config; k_prop = k_prop or c.k_prop_eff
         if k_prop == c.k_refine and getattr(self, "W", None) is not None: return self.W
         if k_prop in self._Wprop: return self._Wprop[k_prop]
@@ -118,7 +118,7 @@ class Fit:
         self._Wprop[k_prop] = W; return W
 
     def propagate(self, labels, labelled_index, mu=None, k_prop=None, log=None):
-        """Equation (propsolve): the labels of every star from those of the labelled stars.  labelled_index indexes
+        """The labels of every star from those of the labelled stars.  labelled_index indexes
         the rows of `labels`, which are the stars of the graph."""
         c = self.config; W = self.propagation_weights(k_prop)
         labels = np.atleast_2d(np.asarray(labels, np.float64)); labels = labels if labels.shape[0] == W.shape[0] else labels.T
@@ -133,13 +133,13 @@ class Fit:
 
 
 def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
-    """The construction of the coordinates, Section 2, on one cube.
+    """The construction of the coordinates on one set of spectra.
 
     flux, good  [N, P] float32 and bool;  segments [P] detector segment id of every pixel;  config: Config.
     err is needed only for continuum="running" (it is divided by the continuum and returned on the Fit).
-    stop="features" returns after the feature vectors of Section 2.1 (the check of the neighbour search uses
-    this), stop="neighbours" after the neighbour search and the lattice (the propagation of Section 2.5 needs
-    only the graph; the label ladders and sweeps use this), stop="lattice" likewise; None runs everything."""
+    stop="features" returns after the feature vectors (to check a neighbour search), stop="neighbours" after the
+    neighbour search and the lattice (the label transfer needs only the graph), stop="lattice" likewise; None runs
+    everything."""
     c = config or Config(); t_all = time.time(); F = Fit(c); lines = []
     def say(s):
         lines.append(f"[{time.time() - t_all:6.0f}s] {s}")
@@ -148,7 +148,7 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
     flux = np.asarray(flux, np.float32); good = np.asarray(good, bool); segments = np.asarray(segments).astype(int); N = len(flux)
     say(f"fit: {N} spectra x {flux.shape[1]} pixels; search {c.search}; threads {nb.get_num_threads()}")
 
-    # ---- Section 2.1: f_i
+    # ---- the normalised flux
     t = time.time()
     if err is None: err = np.ones_like(flux)
     if c.continuum == "running":
@@ -160,7 +160,7 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
     F.fn, F.err = pp.local_renormalise(fn0, pp.segment_chunks(segments, renorm), good, q=c.renorm_q, err=err0); F.good = good; F.segments = segments
     F.timings["normalise"] = time.time() - t; say(f"normalised flux: {F.fn.shape[1]} pixels, {F.timings['normalise']:.1f} s")
 
-    # ---- Section 2.1: the feature vectors whose L1 distance is D
+    # ---- the feature vectors whose L1 distance is D
     t = time.time(); chunkings = [pp.segment_chunks(segments, per) for per in c.chunkings]
     F.features, F.info = dm.build_features(F.fn, good, F.err if c.error_weights else None, chunkings, n_ref=c.n_ref, seed=c.seed, block=c.block)
     F.timings["features"] = time.time() - t
@@ -168,7 +168,7 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
     if stop == "features":
         F.timings["total"] = time.time() - t_all; F.log_lines = lines; say(f"stopped after the features ({F.timings['total']:.0f} s)"); return F
 
-    # ---- Section 2.2: neighbours under D and the lattice
+    # ---- neighbours under D and the lattice
     t = time.time(); k_max = max(c.k_lattice, c.k_refine, c.k_prop_eff)
     F.nbr, F.dist = lm.neighbours(F.features, k_max, search=c.search, block=c.block, seed=c.seed)
     F.timings["neighbours"] = time.time() - t; say(f"neighbours: k = {k_max} by {c.search} search, {F.timings['neighbours']:.1f} s")
@@ -179,7 +179,7 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
         t = time.time(); F.X_pca = rm.pca_flux(F.fn, good, c.n_pca, fit_max=c.pca_fit_max, seed=c.seed); F.timings["pca"] = time.time() - t
         F.timings["total"] = time.time() - t_all; F.log_lines = lines; say(f"stopped after the {stop} ({F.timings['total']:.0f} s)"); return F
 
-    # ---- Section 2.2-2.3: geodesics from the landmarks and the coordinates
+    # ---- geodesics from the landmarks and the coordinates
     t = time.time()
     F.landmarks = np.arange(N) if (c.n_landmarks is None or c.n_landmarks >= N) else np.random.default_rng(c.seed).permutation(N)[:c.n_landmarks]
     Dl = lm.geodesics(F.lattice, F.landmarks); F.timings["geodesics"] = time.time() - t
@@ -187,7 +187,7 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
     t = time.time(); F.C_geo, F.eigenvalues = cm.landmark_mds(Dl, F.landmarks, c.d, c.n_eig); F.timings["mds"] = time.time() - t
     say(f"coordinates: d = {c.d}; eigenvalue ratios {np.round(F.eigenvalues[:8] / max(F.eigenvalues[0], 1e-300), 3).tolist()}, {F.timings['mds']:.1f} s")
 
-    # ---- Section 2.4: the refinement
+    # ---- the refinement
     t = time.time(); F.X_pca = rm.pca_flux(F.fn, good, c.n_pca, fit_max=c.pca_fit_max, seed=c.seed)
     F.timings["pca"] = time.time() - t
     t = time.time(); F.W = rm.lle_weights(F.X_pca, F.nbr[:, :c.k_refine], reg=c.reg); F.timings["lle"] = time.time() - t

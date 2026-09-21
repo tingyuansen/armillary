@@ -1,4 +1,4 @@
-"""Section 2.5, transferring labels through the graph: equations (propagate) and (propsolve).
+"""Transferring labels through the graph.
 
     propagate   [(I - W)^T (I - W) + mu P] Y = mu P Yhat, P the diagonal indicator of the labelled stars, Yhat
                 their labels; mu scaled as in the refinement, mu = mu_0 x tr[(I-W)^T(I-W)] / N; solved by
@@ -13,7 +13,7 @@ from .refine import _system
 
 
 def propagate(W, labelled, Y_lab, mu=1.0, tol=1e-9, maxiter=20000, log=None):
-    """Equation (propsolve).  labelled: the indices of the labelled stars; Y_lab [n_lab, L] their labels.
+    """The transfer.  labelled: the indices of the labelled stars; Y_lab [n_lab, L] their labels.
     Returns (Y [N, L], residuals): the labels of every star and the relative residual of every column."""
     N = W.shape[0]; M, Mt, tr, diag = _system(W); m = mu * tr / N
     labelled = np.asarray(labelled); Y_lab = np.atleast_2d(np.asarray(Y_lab, np.float64))

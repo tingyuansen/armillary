@@ -1,6 +1,10 @@
 # Armillary
 
-Armillary builds a coordinate system for a spectroscopic survey from the spectra alone, and then transfers labels (effective temperature, surface gravity, abundances, or anything else measured for a few stars) to every other star through that coordinate system. It needs no model spectra and no training set to place the stars; labels enter only at the end, and a few dozen labelled stars are enough for a survey of hundreds of thousands. The method is described in Ting (2026), *Armillary: a label-free coordinate system for stellar spectra*; this repository is the package that implements it, with a tutorial on synthetic spectra.
+Armillary builds a coordinate system for a spectroscopic survey from the spectra alone, and then transfers labels (effective temperature, surface gravity, abundances, or anything else measured for a few stars) to every other star through that coordinate system. It needs no model spectra and no training set to place the stars; labels enter only at the end, and a few dozen labelled stars are enough for a survey of hundreds of thousands. The method is described in Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*; this repository is the package that implements it, with a tutorial on synthetic spectra.
+
+![The seven steps of Armillary](examples/armillary_schematic.png)
+
+*From left to right: two spectra and their cumulative absorption curves, whose separation is the distance between them; the table of distances between all pairs; the neighbour graph on the manifold the spectra trace out; a geodesic along it; the coordinates that reproduce the geodesic distances; the same after the locally linear refinement; and labels carried from four labelled stars (the orange stars) to every other star.*
 
 ## How it works
 
@@ -55,7 +59,14 @@ Y = F.propagate(z["labels"], labelled_index=labelled)   # labels for every star,
 
 ## The tutorial
 
-[`armillary_tutorial.ipynb`](armillary_tutorial.ipynb) runs the whole method on the 2,100 synthetic spectra in `examples/synthetic_spectra.npz` (calculated with [Payne Zero](https://github.com/tingyuansen/payne-zero), 480 to 680 nm at a resolving power of 10,000; a survey-like population and a uniform sample, each with its true labels): the coordinates and how the labels vary across them, the transfer of labels from 50 stars to the other 2,050 (22 K, 0.08 dex and 0.05 dex at 1 sigma), the same at a signal-to-noise ratio of 30, and how to apply the calls to a real survey. It runs in under a minute on a laptop.
+[`armillary_tutorial.ipynb`](armillary_tutorial.ipynb) runs the whole method on the 6,775 synthetic spectra in `examples/synthetic_spectra.npz` (calculated with [Payne Zero](https://github.com/tingyuansen/payne-zero), 480 to 680 nm at a resolving power of 10,000, each with its true labels): a grid over effective temperature, surface gravity and metallicity, a survey-like population, and a uniform sample. It shows, in the figures of the paper:
+
+1. the showcase: the label grid recovered in the coordinates with no label used, at three metallicities (the paper's Figure 3);
+2. the seven steps of the schematic above, redrawn on real spectra, every panel computed with the package's functions;
+3. labels transferred from 50 stars to the other 1,450 of the survey-like sample (14 K, 0.04 dex and 0.03 dex at 1 sigma), and the same at a signal-to-noise ratio of 30;
+4. how the calls apply to a real survey.
+
+It runs in about two minutes on a laptop. `examples/tutorial_figures.py` holds the figures and `examples/figure_style.py` the paper's typography, for reuse.
 
 ## Configuration
 
@@ -92,7 +103,7 @@ They check the feature vectors against the pixel-level integral of the distance,
 
 ## Citation
 
-If you use Armillary, please cite Ting (2026), *Armillary: a label-free coordinate system for stellar spectra*.
+If you use Armillary, please cite Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*.
 
 ## Licence
 

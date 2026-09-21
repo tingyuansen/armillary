@@ -1,10 +1,10 @@
-"""Section 2.4, the locally linear refinement: equations (lle), (refine) and (solve).
+"""The locally linear refinement of the coordinates.
 
     pca_flux      the projection of each spectrum on the n_pca leading principal components
                   of the normalised flux (bad pixels at the pixel's sample mean); also the PCA competitor of 3.1
-    lle_weights   the weights w_ij of equation (lle) over each star's neighbours UNDER D, summing to one, with
+    lle_weights   the weights w_ij over each star's neighbours UNDER D, summing to one, with
                   a ridge reg x trace(G) on the local Gram matrix G = Z Z^T; a sparse matrix W
-    refine        equation (solve), [(I - W)^T (I - W) + mu I] C = mu C_geo, mu = rho tr[(I-W)^T(I-W)] / N,
+    refine        the solve [(I - W)^T (I - W) + mu I] C = mu C_geo, mu = rho tr[(I-W)^T(I-W)] / N,
                   by preconditioned conjugate gradients, one column at a time; no dense N x N anywhere
 """
 import time
@@ -16,7 +16,7 @@ from .preprocess import fill_bad
 
 
 def pca_flux(fn, good, n_pca=100, fit_max=30000, seed=0, block=20000):
-    """x_i of equation (lle): the projection of the normalised flux on its n_pca leading principal components.
+    """The projection of the normalised flux on its n_pca leading principal components, the vectors the weights are fitted on.
 
     Bad pixels are set to the pixel's mean over the sample first (preprocess.fill_bad).  The components are fitted on every star when N <= fit_max, else on a random subset of fit_max stars
     (seed `seed`) and every star projected in blocks."""
@@ -28,10 +28,10 @@ def pca_flux(fn, good, n_pca=100, fit_max=30000, seed=0, block=20000):
 
 
 def lle_weights(X, nbr, reg=1e-3, block=None):
-    """The weights of equation (lle): row i of W reconstructs x_i from x_j, j in nbr[i] (its neighbours under
+    """The locally linear weights: row i of W reconstructs x_i from x_j, j in nbr[i] (its neighbours under
     D), with sum_j w_ij = 1.  Roweis & Saul (2000): with Z = x_j - x_i stacked over the neighbours and
     G = Z Z^T the local Gram matrix, w solves (G + reg tr(G) I) w = 1 and is then normalised to sum one.
-    The ridge reg x tr(G) makes the solve unique when the neighbours outnumber the projection's components (Section 2.4).
+    The ridge reg x tr(G) makes the solve unique when the neighbours outnumber the projection's components.
     Returns a csr matrix [N, N] with k entries per row."""
     X = np.asarray(X, np.float64); N, k = nbr.shape; vals = np.empty((N, k))
     block = block or max(16, int(2e8 / (k * k * 8)))
@@ -56,7 +56,7 @@ def _system(W):
 
 
 def refine(C_geo, W, rho=0.003, tol=1e-8, maxiter=20000, log=None):
-    """Equation (solve): C = argmin |(I - W) C|^2 + mu |C - C_geo|^2, i.e. [(I-W)^T(I-W) + mu I] C = mu C_geo,
+    """The refinement: C = argmin |(I - W) C|^2 + mu |C - C_geo|^2, i.e. [(I-W)^T(I-W) + mu I] C = mu C_geo,
     with the anchor strength mu = rho x tr[(I-W)^T(I-W)] / N (dimensionless rho).  Solved by conjugate
     gradients with a Jacobi preconditioner, one column of C at a time.
     Returns (C, residuals): the relative residual |A c - b| / |b| of every column, checked rather than trusted."""

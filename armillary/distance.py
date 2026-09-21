@@ -1,15 +1,14 @@
-"""Section 2.1, the distance between two spectra: equations (rho), (curve), (w1) and (metric).
+"""The distance between two spectra.
 
 Every star becomes one feature vector, the concatenation over chunkings and chunks of its cumulative
-absorption curve, scaled so that the L1 distance between two feature vectors IS the distance D of equation
-(metric).  The neighbour search of lattice.py consumes these vectors and nothing else.
+absorption curve, scaled so that the L1 distance between two feature vectors IS the distance D between the spectra.  The neighbour search of lattice.py consumes these vectors and nothing else.
 
     cumulative_curve   rho and F of one chunk (the depth 1 - f, unclipped, zero on bad pixels, divided by its
                        integral over the chunk, then accumulated; with pixel errors given, the depth is weighted by the
                        pixel's inverse variance, the DESI setting of Config.error_weights)
     build_features     the feature vectors: F at every pixel / median W1 of the chunk, concatenated
     pairwise           blockwise exact L1 distances: the full matrix, or the k nearest of every star
-    w1_pixel           the integral of equation (w1) for one pair, the reference the tests compare against
+    w1_pixel           the distance of one pair summed pixel by pixel, the reference the tests compare against
 """
 import time
 import numpy as np
@@ -62,18 +61,17 @@ def _l1_cand(X, rows, cand, out):
     return out
 
 
-# ------------------------------------------------------------------ rho and F, equations (rho) and (curve)
+# ------------------------------------------------------------------ the cumulative absorption curve
 def cumulative_curve(fn_chunk, good_chunk, err_chunk=None):
-    """The cumulative absorption curve F_i^{(c)} of every star in one chunk, equations (rho) and (curve).
+    """The cumulative absorption curve F of every star in one chunk.
 
     depth = 1 - f on the good pixels and zero on bad pixels.  With `err_chunk` given (Config.error_weights, the
     DESI setting), the depth is weighted by w, the inverse variance 1 / sigma^2 of the pixel normalised to a mean
     of one over the good pixels of the chunk, so that a noisy pixel carries less of the chunk's absorption and the
-    total keeps its scale; the rule of Section 2.1 is that this applies where the errors carry structure of their own
-    (sky and detector, DESI) and not where they follow the photon noise (APOGEE, where it moves absorption from the weak lines
-    into the strong ones, more for a faint star than a bright one, and worsens every result, Section 5.4).  The depth is NOT clipped at zero: where noise puts the flux above the continuum it is negative and left so, because that noise cancels
-    in the cumulative sum, whereas setting it to zero would add a pedestal that grows with the noise level
-    (Section 2.1).  rho = depth / total, F = cumsum(rho), so F = 1 at the last pixel.
+    total keeps its scale; use this where the errors carry structure of their own (sky and detector, as in DESI) and not where
+    they follow the photon noise (as in APOGEE, where it moves absorption from the weak lines into the strong ones, more for a
+    faint star than a bright one, and worsens every result).  The depth is NOT clipped at zero: where noise puts the flux above the continuum it is negative and left so, because that noise cancels
+    in the cumulative sum, whereas setting it to zero would add a pedestal that grows with the noise level.  rho = depth / total, F = cumsum(rho), so F = 1 at the last pixel.
 
     Guard: a chunk whose net absorption |total| is below 1e-3 is divided by 1e-3 instead of by its total, so
     that a chunk with no absorption at all (or one whose positive and negative depths cancel) does not blow up;
@@ -112,14 +110,13 @@ def _median_pairs(X, block=256):
 
 
 def build_features(fn, good, err, chunkings, n_ref=500, seed=0, block=256, log=None, ref_index=None):
-    """The feature vectors whose L1 distance is D of equation (metric).
+    """The feature vectors whose L1 distance is the distance D between two spectra.
 
     For chunk c of a chunking, the block of the feature vector is  F_i^{(c)} / median_{pairs} W1^{(c)},  F at every
     pixel of the chunk (cumulative_curve; `err` None for the plain depth, the pixel errors for the weighted one), so that |Phi_i - Phi_j|_1 =
     sum over every chunk of every chunking of W1^{(c)}(i, j) / median W1^{(c)}, with W1 the sum over the pixels of
-    |F_i - F_j| (equation w1).  The median is over every pair among `n_ref` stars drawn at random (seed `seed`),
-    n_ref (n_ref - 1) / 2 pairs, the same draw for every chunk; `ref_index` names those stars explicitly instead
-    (the three cases of Figure 2 fix them to a subset of the grid).
+    |F_i - F_j| (the one-dimensional Wasserstein distance between the two absorption profiles).  The median is over every pair among `n_ref` stars drawn at random (seed `seed`),
+    n_ref (n_ref - 1) / 2 pairs, the same draw for every chunk; `ref_index` names those stars explicitly instead.
 
     Returns (features float32 [N, length], FeatureInfo)."""
     t0 = time.time(); fn = np.asarray(fn, np.float32); good = np.asarray(good, bool); N = len(fn)
@@ -172,7 +169,7 @@ def pairwise(features, block=256, k=None, verbose=False):
 # ------------------------------------------------------------------ the pixel-level reference
 def w1_pixel(fn, good, err, bounds, i, j):
     # err None for the plain depth
-    """W1^{(c)}(i, j) of equation (w1) for every chunk of one chunking, as the sum over every pixel of
+    """The distance W1(i, j) for every chunk of one chunking, as the sum over every pixel of
     |F_i - F_j| (pixel units, no median normalisation): what the feature vectors' L1 distance reproduces."""
     out = []
     for a, b in bounds:

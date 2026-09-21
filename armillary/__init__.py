@@ -1,15 +1,17 @@
-"""Armillary: coordinates for a spectroscopic survey from the spectra alone.
+"""Armillary: coordinates for a spectroscopic survey from the spectra alone, and labels for every star from a few labelled ones.
 
-The package implements Section 2 of the paper (Construction of the Coordinates).  The steps and where each lives:
+The method, and where each step lives:
 
-    preprocess.py    the normalised flux f_i (Section 2.1, "the flux divided by a locally fitted continuum")
-    distance.py      the distance D between two spectra, equations (rho), (curve), (w1) and (metric)
-    lattice.py       the neighbour graph (the code's lattice) and the geodesic distances, equation (geodesic)
-    coordinates.py   coordinates from geodesic distances, equation (mds), by landmark MDS
-    refine.py        the locally linear refinement, equations (lle), (refine) and (solve)
-    labels.py        transferring labels through the graph, equations (propagate) and (propsolve)
+    preprocess.py    the normalised flux: each spectrum divided by a locally fitted continuum
+    distance.py      the distance between two spectra, from their cumulative absorption in a hierarchy of wavelength chunks
+    lattice.py       the neighbour graph (called the lattice in the code) and the geodesic distances along it
+    coordinates.py   coordinates from the geodesic distances, by landmark multidimensional scaling
+    refine.py        the locally linear refinement of the coordinates
+    labels.py        the transfer of labels through the graph
     pipeline.py      Config and fit(): the whole chain with timings
-    evaluate.py      the probes and scores the paper reports
+    evaluate.py      the error statistic and the probes used to score coordinates and transferred labels
+
+The method is described in Ting & Saad (2026), Armillary: a label-free coordinate system for stellar spectra.
 """
 from . import preprocess, distance, lattice, coordinates, refine, labels, evaluate  # noqa: F401
 from .pipeline import Config, fit, Fit  # noqa: F401

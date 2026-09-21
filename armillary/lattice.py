@@ -1,4 +1,4 @@
-"""Section 2.2, the lattice and geodesic distances: equation (geodesic).
+"""The neighbour graph (the lattice) and the geodesic distances along it.
 
     neighbours    the k nearest neighbours of every star under D, by the exact blockwise search of
                   distance.pairwise or by nearest-neighbour descent (pynndescent, manhattan metric, seeded),
@@ -7,8 +7,8 @@
     lattice       the graph G: every star joined to its k nearest neighbours, edges symmetrised and weighted
                   by D; every separate piece joined to the largest by the single shortest edge between a
                   star inside it and a star of the largest piece.  No minimum spanning tree.
-    geodesics     D^g of equation (geodesic) from a set of landmarks, by Dijkstra's algorithm on G.
-    overlap       how much two neighbour lists agree (for the checks of the paper's Implementation section).
+    geodesics     the geodesic distances from a set of landmarks, by Dijkstra's algorithm on G.
+    overlap       how much two neighbour lists agree (to check an approximate search against the exact one).
 """
 import time
 import numpy as np
@@ -27,8 +27,7 @@ def neighbours(features, k, search="exact", block=256, seed=0, verbose=False):
 
 
 def _nndescent(features, k, seed=0, verbose=False):
-    """Nearest-neighbour descent (Dong et al. 2011) on the feature vectors under the manhattan (L1) metric,
-    ported from the validated scalable_knn.knn_approx(..., return_dist=True).
+    """Nearest-neighbour descent (Dong et al. 2011) on the feature vectors under the manhattan (L1) metric.
 
     The search supplies candidate lists only.  Every distance is then recomputed with the exact kernel
     (_l1_cand, the kernel the exact search sums) and each row re-sorted on those values, so the result has the
@@ -36,7 +35,7 @@ def _nndescent(features, k, seed=0, verbose=False):
     where the neighbour is the same.  A row the descent left short (a heap slot never filled, marked -1) is
     replaced by its exact neighbours.
 
-    Its overlap with the exact search at full scale is measured by experiments/survey_ann_check.py (Section 2.6)."""
+    overlap() measures how well it agrees with the exact search."""
     import warnings, pynndescent
     warnings.filterwarnings("ignore")
     X = np.ascontiguousarray(features, np.float32); N = len(X); t0 = time.time()
@@ -61,7 +60,7 @@ def _nndescent(features, k, seed=0, verbose=False):
 
 
 def lattice(nbr, dist, features=None, verbose=False, log=None):
-    """The lattice G of Section 2.2 from the neighbour lists (ported from scalable_knn.lattice_from_knn).
+    """The lattice G from the neighbour lists.
 
     G has an edge (i, j) of weight D_ij whenever j is among the k nearest of i or i among the k nearest of j.
     If the graph falls into several pieces, each piece is joined to the largest by one edge, the shortest
@@ -95,7 +94,7 @@ def lattice(nbr, dist, features=None, verbose=False, log=None):
 
 
 def geodesics(G, landmarks):
-    """D^g_{lj} of equation (geodesic) from every landmark l to every star j: Dijkstra's algorithm on the
+    """The geodesic distance from every landmark l to every star j: Dijkstra's algorithm on the
     lattice, one run per landmark.  Returns float64 [n_landmarks, N]."""
     Dl = dijkstra(G, directed=False, indices=np.asarray(landmarks))
     if not np.isfinite(Dl).all():

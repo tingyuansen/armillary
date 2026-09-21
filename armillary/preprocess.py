@@ -1,4 +1,4 @@
-"""What makes f_i, "the flux divided by a locally fitted continuum" (Section 2.1).
+"""The normalised flux: each spectrum divided by a locally fitted continuum.
 
 Two continuum steps exist:
 
@@ -84,7 +84,7 @@ def prepare(flux, err, good, seg_id, window_px=100, q=0.90, min_cover=0.9, lo=0.
 
 def segment_chunks(seg_id, per_segment):
     """Chunk bounds [(a, b), ...] of one chunking: per_segment[s] equal-width chunks in detector segment s.
-    Several chunkings, from coarse to fine, give the hierarchy of scales of Section 2.1."""
+    Several chunkings, from coarse to fine, give the hierarchy of scales the distance is built on."""
     seg_id = np.asarray(seg_id); bounds = []
     for s, n in enumerate(per_segment):
         idx = np.where(seg_id == s)[0]
@@ -95,7 +95,7 @@ def segment_chunks(seg_id, per_segment):
 
 
 def local_renormalise(flux, bounds, good, q=0.85, floor=0.2, err=None):
-    """f_i of Section 2.1: within each chunk (a, b) of `bounds`, divide the flux by a straight line fitted
+    """The normalised flux: within each chunk (a, b) of `bounds`, divide the flux by a straight line fitted
     through the good pixels at or above the q-quantile of the chunk (the local continuum).  Bad pixels are
     divided too but never enter a fit.  Returns float32; with `err` given, (flux, err) both divided by the line."""
     f = np.asarray(flux, np.float64); out = f.copy(); good = np.asarray(good, bool)
