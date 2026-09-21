@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "armillary"
+version = "0.2.0"
+description = "Coordinates for a spectroscopic survey from the spectra alone, and labels for every star from a few labelled ones"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [{name = "Yuan-Sen Ting"}]
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.12", "scikit-learn>=1.3", "numba>=0.58", "pynndescent>=0.5"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+tutorial = ["matplotlib", "jupyterlab"]
+
+[project.urls]
+Repository = "https://github.com/tingyuansen/armillary-package"
+
+[tool.setuptools]
+packages = ["armillary"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: needs the paper's APOGEE test cube (ARMILLARY_APOGEE_CUBE) and a few minutes"]
