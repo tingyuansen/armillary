@@ -62,11 +62,11 @@ Y = F.propagate(z["labels"], labelled_index=labelled)   # labels for every star,
 [`armillary_tutorial.ipynb`](armillary_tutorial.ipynb) runs the whole method on the 6,775 synthetic spectra in `examples/synthetic_spectra.npz` (calculated with [Payne Zero](https://github.com/tingyuansen/payne-zero), 480 to 680 nm at a resolving power of 10,000, each with its true labels): a grid over effective temperature, surface gravity and metallicity, a survey-like population, and a uniform sample. It shows, in the figures of the paper:
 
 1. the showcase: the label grid recovered in the coordinates with no label used, at three metallicities (the paper's Figure 3);
-2. the seven steps of the schematic above, redrawn on real spectra, every panel computed with the package's functions;
+2. the seven steps of the schematic above, and where each product sits on the `Fit`;
 3. labels transferred from 50 stars to the other 1,450 of the survey-like sample (14 K, 0.04 dex and 0.03 dex at 1 sigma), and the same at a signal-to-noise ratio of 30;
 4. how the calls apply to a real survey.
 
-It runs in about two minutes on a laptop. `examples/tutorial_figures.py` holds the figures and `examples/figure_style.py` the paper's typography, for reuse.
+It runs in about a minute on a laptop. `examples/tutorial_figures.py` holds the figures and `examples/figure_style.py` the paper's typography, for reuse.
 
 ## Configuration
 
