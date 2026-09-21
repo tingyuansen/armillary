@@ -25,8 +25,8 @@ Every spectrum is normalised to a local continuum and turned into a set of cumul
 Python 3.10 or newer.
 
 ```bash
-git clone https://github.com/tingyuansen/armillary-package.git
-cd armillary-package
+git clone https://github.com/tingyuansen/armillary.git
+cd armillary
 python -m pip install -e .
 ```
 
@@ -63,7 +63,7 @@ Y = F.propagate(z["labels"], labelled_index=labelled)   # labels for every star,
 
 1. the showcase: the label grid recovered in the coordinates with no label used, at three metallicities (the paper's Figure 3);
 2. the seven steps of the schematic above, and where each product sits on the `Fit`;
-3. labels transferred from 50 stars to the other 4,625, and the same at a signal-to-noise ratio of 30;
+3. labels transferred from 50 stars to the other 4,625; the same at a signal-to-noise ratio of 30; and, with noise that varies across the spectrum and sky-line pixels, the error-weighted distance (`error_weights=True`) against the plain one;
 4. how the calls apply to a real survey.
 
 It runs in about a minute on a laptop. `examples/tutorial_figures.py` holds the figures and `examples/figure_style.py` the paper's typography, for reuse.
@@ -79,7 +79,7 @@ Every parameter of the method is a field of `Config`, documented in `armillary/p
 | `Config.paper_desi()` | DESI, spectra with their instrumental response | a running continuum first, four chunkings, the absorption weighted by the pixel errors, 800 landmarks, nearest-neighbour descent |
 | `Config.paper_synthetic()` | the synthetic grid and the tutorial | one segment, one chunking of 32 chunks, three coordinates, 50 neighbours for the refinement |
 
-The fields that matter most when adapting the method to a new survey are `chunkings` (the wavelength chunks per detector segment, coarse to fine), `continuum` (`"none"` for spectra that arrive normalised, `"running"` for spectra with their response), `error_weights` (weight each pixel's absorption by its inverse variance, for surveys whose errors carry sky and detector structure), `d` (the number of coordinates; read it from `Fit.eigenvalues`), and `search` (`"exact"` up to a few tens of thousands of stars, `"nndescent"` beyond). A configuration can be saved to and loaded from JSON with `Config.save` and `Config.load`.
+The fields that matter most when adapting the method to a new survey are `chunkings` (the wavelength chunks per detector segment, coarse to fine), `continuum` (`"none"` for spectra that arrive normalised, `"running"` for spectra with their response), `error_weights` (weight each pixel's absorption by its inverse variance; off by default, because it helps where the errors carry sky and detector structure, as in DESI, and hurts where they follow the photon noise, as in APOGEE), `d` (the number of coordinates; read it from `Fit.eigenvalues`), and `search` (`"exact"` up to a few tens of thousands of stars, `"nndescent"` beyond). A configuration can be saved to and loaded from JSON with `Config.save` and `Config.load`.
 
 ## Input format
 

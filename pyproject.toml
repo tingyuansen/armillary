@@ -17,7 +17,7 @@ test = ["pytest"]
 tutorial = ["matplotlib", "jupyterlab"]
 
 [project.urls]
-Repository = "https://github.com/tingyuansen/armillary-package"
+Repository = "https://github.com/tingyuansen/armillary"
 
 [tool.setuptools]
 packages = ["armillary"]
