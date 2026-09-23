@@ -94,7 +94,7 @@ class Config:
 
 class Fit:
     """What fit() returns.  Attributes (N stars, F features, m landmarks):
-        config, timings (dict, seconds per step), log (list of lines)
+        config, timings (dict, seconds per step), log_lines (list of lines)
         pixel_mask   the pixels kept (continuum="running" drops some); segments of the kept pixels
         fn, good, err the normalised flux f_i (float32 [N, P]), its good-pixel mask and its error after the same normalisation
         features     the feature vectors (float32 [N, F]); info: distance.FeatureInfo
@@ -136,7 +136,8 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
     """The construction of the coordinates on one set of spectra.
 
     flux, good  [N, P] float32 and bool;  segments [P] detector segment id of every pixel;  config: Config.
-    err is needed only for continuum="running" (it is divided by the continuum and returned on the Fit).
+    err supplies pixel standard deviations for continuum="running" or error_weights=True; if omitted,
+    an array of ones is used. It is divided by the continuum and returned on the Fit.
     stop="features" returns after the feature vectors (to check a neighbour search), stop="neighbours" after the
     neighbour search and the lattice (the label transfer needs only the graph), stop="lattice" likewise; None runs
     everything."""

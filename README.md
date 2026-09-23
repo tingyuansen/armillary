@@ -8,7 +8,7 @@ Armillary builds a coordinate system for a spectroscopic survey from the spectra
 
 ## How it works
 
-Every spectrum is normalised to a local continuum and turned into a set of cumulative absorption curves, one per wavelength chunk at several chunk sizes; the distance between two spectra is the sum over chunks of the area between their curves (a signed cumulative-profile distance inspired by one-dimensional Wasserstein distance). Negative depths above the continuum are retained, so the curves need not be probability cumulative distributions. Each star is joined to its nearest neighbours under that distance, the graph is made connected, and distances along the graph become coordinates by landmark multidimensional scaling. The coordinates are then refined so that every star is the same local linear combination of its neighbours in coordinate space as it is in spectrum space, and labels are carried through those same local combinations from the labelled stars to all the others.
+Every spectrum is normalised to a local continuum and turned into a set of cumulative absorption curves, one per wavelength chunk at several chunk sizes; the distance between two spectra is the sum over chunks of the area between their curves (a signed cumulative-profile distance inspired by one-dimensional Wasserstein distance). Negative depths above the continuum are retained, so the curves need not be probability cumulative distributions. Each star is joined to its nearest neighbours under that distance, the graph is made connected, and distances along the graph become coordinates by landmark multidimensional scaling. Refinement balances agreement with local linear combinations of neighbouring spectra against staying near those initial coordinates. Labels are transferred using the same local weights, with a penalty for disagreement with the known labels.
 
 | step | module | what it computes |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ This installs the package and its dependencies (NumPy, SciPy, scikit-learn, numb
 
 ```bash
 python -m pip install -e ".[test,tutorial]"
-python -m pytest tests            # a few seconds
+python -m pytest tests -m "not slow"   # the fast tests
 jupyter lab armillary_tutorial.ipynb
 ```
 
@@ -55,7 +55,7 @@ labelled = np.arange(0, len(flux), 42)       # the stars whose labels are known
 Y = F.propagate(z["labels"], labelled_index=labelled)   # labels for every star, [N, 3]
 ```
 
-`fit` returns a `Fit` holding every intermediate product (the normalised flux, the feature vectors, each star's neighbours and distances, the graph, the eigenvalues, the unrefined and refined coordinates, the timings of every step). `Fit.propagate` transfers any table of labels; `Fit.save(path)` writes the coordinates and what is needed to draw or re-score them.
+`fit` returns a `Fit` holding every intermediate product (the normalised flux, the feature vectors, each star's neighbours and distances, the graph, the eigenvalues, the unrefined and refined coordinates, the timings of every step). `Fit.propagate` transfers any table of labels; `Fit.save(path)` writes the coordinates and what is needed to draw or re-score them. This archive does not restore a `Fit` or its propagation weights; keep the in-memory `Fit` to transfer additional labels.
 
 ## The tutorial
 
@@ -88,14 +88,16 @@ The fields that matter most when adapting the method to a new survey are `chunki
 - `flux`: `[N, P]` float, the spectra on a common wavelength grid, continuum-normalised unless `continuum="running"`;
 - `good`: `[N, P]` bool, False on bad pixels (they take no part in any fit and carry no absorption);
 - `segments`: `[P]` int, the detector segment of every pixel, numbered from 0, so that chunks never straddle a gap;
-- `err`: `[N, P]` float, needed for `continuum="running"` and `error_weights=True`.
+- `err`: `[N, P]` float, the pixel standard deviations; provide these for `continuum="running"` or `error_weights=True`. If omitted, the code uses an array of ones.
 
 Labels for `Fit.propagate` are an `[N, L]` array (rows for every star of the fit, any values on the unlabelled rows) with `labelled_index` naming the rows whose values are known.
+
+Training indices must be unique and in range, their labels finite, and every connected component of the propagation weights must contain a training star. Invalid training sets raise `ValueError`; refinement or transfer that fails to converge raises `RuntimeError`.
 
 ## Tests
 
 ```bash
-python -m pytest tests                       # the fast tests, a few seconds
+python -m pytest tests -m "not slow"         # the fast tests, a few seconds
 ARMILLARY_APOGEE_CUBE=/path/to/apogee_cube.npz python -m pytest tests -m slow   # nn-descent against the exact search on the paper's APOGEE test cube
 ```
 
