@@ -71,7 +71,7 @@ def cumulative_curve(fn_chunk, good_chunk, err_chunk=None):
     total keeps its scale; use this where the errors carry structure of their own (sky and detector, as in DESI) and not where
     they follow the photon noise (as in APOGEE, where it moves absorption from the weak lines into the strong ones, more for a
     faint star than a bright one, and worsens every result).  The depth is NOT clipped at zero: where noise puts the flux above the continuum it is negative and left so, because that noise cancels
-    in the cumulative sum, whereas setting it to zero would add a pedestal that grows with the noise level.  rho = depth / total, F = cumsum(rho), so F = 1 at the last pixel.
+    in the cumulative sum, whereas setting it to zero would add a pedestal that grows with the noise level.  These are signed cumulative profiles, not probability CDFs: their L1 distance agrees with one-dimensional Wasserstein distance only for nonnegative unit-normalised profiles. rho = depth / total, F = cumsum(rho), so F = 1 at the last pixel except in the guarded case below.
 
     Guard: a chunk whose net absorption |total| is below 1e-3 is divided by 1e-3 instead of by its total, so
     that a chunk with no absorption at all (or one whose positive and negative depths cancel) does not blow up;
@@ -151,7 +151,8 @@ def pairwise(features, block=256, k=None, verbose=False):
         for lo in range(0, N, block):
             hi = min(lo + block, N); _l1_block(X, lo, hi, D[lo:hi])
         return D
-    if k >= N: raise ValueError(f"k = {k} must be smaller than N = {N}")
+    if not isinstance(k, (int, np.integer)) or not 0 < k < N:
+        raise ValueError(f"k = {k} must be a positive integer smaller than N = {N}")
     nbr = np.empty((N, k), np.int32); dst = np.empty((N, k), np.float32); buf = np.empty((block, N), np.float32)
     for lo in range(0, N, block):
         hi = min(lo + block, N); b = _l1_block(X, lo, hi, buf[: hi - lo])

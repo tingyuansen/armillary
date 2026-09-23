@@ -1,6 +1,6 @@
 # Armillary
 
-Armillary builds a coordinate system for a spectroscopic survey from the spectra alone, and then transfers labels (effective temperature, surface gravity, abundances, or anything else measured for a few stars) to every other star through that coordinate system. It needs no model spectra and no training set to place the stars; labels enter only at the end, and a few dozen labelled stars are enough for a survey of hundreds of thousands. The method is described in Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*; this repository is the package that implements it, with a tutorial on synthetic spectra.
+Armillary builds a coordinate system for a spectroscopic survey from the spectra alone, and then transfers labels (effective temperature, surface gravity, abundances, or anything else measured for a few stars) to every other star through that coordinate system. It needs no model spectra and no training set to place the stars; labels enter only at the end, and a few dozen labelled stars can recover the broad stellar-parameter structure of a survey of hundreds of thousands. The method is described in Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*; this repository is the package that implements it, with a tutorial on synthetic spectra.
 
 ![The seven steps of Armillary](examples/armillary_schematic.png)
 
@@ -8,7 +8,7 @@ Armillary builds a coordinate system for a spectroscopic survey from the spectra
 
 ## How it works
 
-Every spectrum is normalised to a local continuum and turned into a set of cumulative absorption curves, one per wavelength chunk at several chunk sizes; the distance between two spectra is the sum over chunks of the area between their curves (a one-dimensional Wasserstein distance). Each star is joined to its nearest neighbours under that distance, the graph is made connected, and distances along the graph become coordinates by landmark multidimensional scaling. The coordinates are then refined so that every star is the same local linear combination of its neighbours in coordinate space as it is in spectrum space, and labels are carried through those same local combinations from the labelled stars to all the others.
+Every spectrum is normalised to a local continuum and turned into a set of cumulative absorption curves, one per wavelength chunk at several chunk sizes; the distance between two spectra is the sum over chunks of the area between their curves (a signed cumulative-profile distance inspired by one-dimensional Wasserstein distance). Negative depths above the continuum are retained, so the curves need not be probability cumulative distributions. Each star is joined to its nearest neighbours under that distance, the graph is made connected, and distances along the graph become coordinates by landmark multidimensional scaling. The coordinates are then refined so that every star is the same local linear combination of its neighbours in coordinate space as it is in spectrum space, and labels are carried through those same local combinations from the labelled stars to all the others.
 
 | step | module | what it computes |
 | --- | --- | --- |
@@ -70,7 +70,7 @@ It runs in about a minute on a laptop. `examples/tutorial_figures.py` holds the 
 
 ## Configuration
 
-Every parameter of the method is a field of `Config`, documented in `armillary/pipeline.py`. Three presets reproduce the paper's runs:
+Every parameter of the method is a field of `Config`, documented in `armillary/pipeline.py`. The presets provide the paper's method configurations; their selection used the validation procedures described in the paper. For a fixed configuration, coordinate construction uses no labels:
 
 | preset | survey | what it sets |
 | --- | --- | --- |

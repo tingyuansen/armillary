@@ -21,6 +21,8 @@ def neighbours(features, k, search="exact", block=256, seed=0, verbose=False):
     """Each star's k nearest neighbours under D (the L1 distance between feature vectors).
 
     Returns (nbr int32 [N, k], dist float32 [N, k]) sorted by distance, self excluded."""
+    if not isinstance(k, (int, np.integer)) or not 0 < k < len(features):
+        raise ValueError(f"k = {k} must be a positive integer smaller than N = {len(features)}")
     if search == "exact": return pairwise(features, block=block, k=k, verbose=verbose)
     if search == "nndescent": return _nndescent(features, k, seed=seed, verbose=verbose)
     raise ValueError(f"unknown search {search!r}: 'exact' or 'nndescent'")
@@ -68,12 +70,19 @@ def lattice(nbr, dist, features=None, verbose=False, log=None):
     then).  Returns (G csr symmetric, info dict with the number of components, their sizes and the bridges)."""
     N, k = nbr.shape
     rows = np.repeat(np.arange(N), k); cols = nbr.ravel(); vals = np.asarray(dist, np.float64).ravel()
+    # Sparse maximum drops explicit zero edges. Keep them during graph assembly
+    # using a marker below any positive float32 distance, then restore exact zeros
+    # before returning the graph (and before any geodesic calculation).
+    zero_edge = np.nextafter(0.0, 1.0)
+    vals = np.where(vals == 0, zero_edge, vals)
     m = rows != cols
     G = sp.coo_matrix((vals[m], (rows[m], cols[m])), shape=(N, N)).tocsr(); G = G.maximum(G.T)
     ncomp, lab = connected_components(G, directed=False)
     info = dict(components=int(ncomp), bridges=0, bridge_edges=[], piece_sizes=sorted(np.bincount(lab).tolist(), reverse=True))
     if log: log(f"lattice: k-NN graph has {ncomp} component(s)" + (f", sizes {info['piece_sizes']}" if ncomp > 1 else ""))
-    if ncomp == 1: return G, info
+    if ncomp == 1:
+        G.data[G.data == zero_edge] = 0.0
+        return G, info
     if features is None: raise ValueError("the k-NN graph is disconnected; the feature vectors are needed to bridge it")
     X = np.ascontiguousarray(features, np.float32)
     order = np.argsort(np.bincount(lab))[::-1]; main = order[0]; tgt = np.where(lab == main)[0].astype(np.int64)
@@ -86,7 +95,9 @@ def lattice(nbr, dist, features=None, verbose=False, log=None):
             if d[i_, j_] < best[0]: best = (float(d[i_, j_]), int(rows_[i_]), int(tgt[j_]))
         er += [best[1], best[2]]; ec += [best[2], best[1]]; ev += [best[0], best[0]]
         info["bridge_edges"].append((best[1], best[2], best[0]))
+    ev = np.asarray(ev); ev = np.where(ev == 0, zero_edge, ev)
     B = sp.coo_matrix((ev, (er, ec)), shape=(N, N)).tocsr(); G = G.maximum(B)
+    G.data[G.data == zero_edge] = 0.0
     assert connected_components(G, directed=False)[0] == 1
     info["bridges"] = ncomp - 1
     if log: log(f"lattice: bridged {ncomp - 1} component(s)")

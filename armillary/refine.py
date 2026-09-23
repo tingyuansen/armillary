@@ -20,7 +20,8 @@ def pca_flux(fn, good, n_pca=100, fit_max=30000, seed=0, block=20000):
 
     Bad pixels are set to the pixel's mean over the sample first (preprocess.fill_bad).  The components are fitted on every star when N <= fit_max, else on a random subset of fit_max stars
     (seed `seed`) and every star projected in blocks."""
-    X = fill_bad(fn, good); N = len(X); n = min(n_pca, N - 1)
+    X = fill_bad(fn, good); N = len(X); n = min(n_pca, X.shape[1], min(N, fit_max) - 1)
+    if n < 1: raise ValueError("PCA needs at least two fit spectra, one pixel and one component")
     if N <= fit_max: return PCA(n_components=n, random_state=seed).fit_transform(X)
     fit = np.random.default_rng(seed).choice(N, fit_max, replace=False)
     pca = PCA(n_components=n, random_state=seed).fit(X[fit])
@@ -55,11 +56,20 @@ def _system(W):
     return M, Mt, tr, diag
 
 
+def _check_cg(info, residual, tol, operation, column):
+    """Reject incomplete or non-finite solves even when no logger was supplied."""
+    if info != 0 or not np.isfinite(residual) or residual > max(10 * tol, 1e-12):
+        raise RuntimeError(f"{operation}: column {column} did not converge "
+                           f"(cg info {info}, relative residual {residual:.2e}, tolerance {tol:.2e})")
+
+
 def refine(C_geo, W, rho=0.003, tol=1e-8, maxiter=20000, log=None):
     """The refinement: C = argmin |(I - W) C|^2 + mu |C - C_geo|^2, i.e. [(I-W)^T(I-W) + mu I] C = mu C_geo,
     with the anchor strength mu = rho x tr[(I-W)^T(I-W)] / N (dimensionless rho).  Solved by conjugate
     gradients with a Jacobi preconditioner, one column of C at a time.
-    Returns (C, residuals): the relative residual |A c - b| / |b| of every column, checked rather than trusted."""
+    Returns (C, residuals): the relative residual |A c - b| / |b| of every column, checked rather than trusted.
+    Raises RuntimeError if any solve fails to converge."""
+    if not np.isfinite(rho) or rho <= 0: raise ValueError("rho must be finite and positive")
     N = W.shape[0]; M, Mt, tr, diag = _system(W); mu = rho * tr / N
     Minv = 1.0 / np.maximum(diag + mu, 1e-12)
     A = LinearOperator((N, N), matvec=lambda v: Mt @ (M @ v) + mu * v, dtype=np.float64)
@@ -70,4 +80,5 @@ def refine(C_geo, W, rho=0.003, tol=1e-8, maxiter=20000, log=None):
         x, info = cg(A, b, rtol=tol, maxiter=maxiter, M=P)
         r = float(np.linalg.norm(A @ x - b) / max(np.linalg.norm(b), 1e-300)); res.append(r); out[:, j] = x
         if log: log(f"refine: column {j} cg info {info}, relative residual {r:.2e}, {time.time() - t0:.1f} s")
+        _check_cg(info, r, tol, "refine", j)
     return out, np.array(res)

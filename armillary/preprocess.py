@@ -105,7 +105,9 @@ def local_renormalise(flux, bounds, good, q=0.85, floor=0.2, err=None):
         x = np.linspace(-1, 1, b - a); A = np.column_stack([np.ones(b - a), x])
         thr = np.array([np.quantile(r[m > 0], q) if m.sum() > 10 else -np.inf for r, m in zip(seg_f, g)])[:, None]
         w = g * (seg_f >= thr)
-        AtA = np.einsum("np,pi,pj->nij", w, A, A); Aty = np.einsum("np,pi,np->ni", w, A, seg_f)
+        # Multiplying a masked NaN or infinity by zero still gives NaN.
+        fit_flux = np.where(g > 0, seg_f, 0.0)
+        AtA = np.einsum("np,pi,pj->nij", w, A, A); Aty = np.einsum("np,pi,np->ni", w, A, fit_flux)
         coef = np.linalg.solve(AtA + 1e-6 * np.eye(2), Aty[..., None])[..., 0]
         line = np.clip(coef[:, :1] + coef[:, 1:] * x, floor, None); out[:, a:b] = seg_f / line
         if e_out is not None: e_out[:, a:b] = e_out[:, a:b] / line
@@ -117,5 +119,5 @@ def fill_bad(fn, good):
     that it adds nothing to the covariance: the matrix refine.pca_flux decomposes and the input of the Euclidean
     competitors."""
     fn = np.asarray(fn, np.float32); good = np.asarray(good, bool)
-    n = good.sum(0); mean = np.where(n > 0, (fn * good).sum(0) / np.maximum(n, 1), 1.0).astype(np.float32)
+    n = good.sum(0); mean = np.where(n > 0, np.where(good, fn, 0.0).sum(0) / np.maximum(n, 1), 1.0).astype(np.float32)
     return np.where(good, fn, mean[None, :])

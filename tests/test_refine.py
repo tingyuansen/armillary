@@ -1,5 +1,6 @@
 """The conjugate-gradient refinement equals the dense solve of equation (solve) on 500 stars."""
 import numpy as np
+import pytest
 from armillary import refine as rm, distance as dm
 
 
@@ -21,3 +22,16 @@ def test_cg_equals_dense():
     C_cg, res = rm.refine(C_geo, W, rho=rho, tol=1e-12)
     assert res.max() < 1e-10
     assert np.allclose(C_cg, C_dense, rtol=1e-7, atol=1e-8 * np.abs(C_dense).max())
+
+
+def test_nonconverged_refinement_is_not_returned_as_a_result():
+    W, C_geo = _case(n=80)
+    with pytest.raises(RuntimeError, match="did not converge"):
+        rm.refine(C_geo, W, maxiter=1)
+
+
+@pytest.mark.parametrize("pixels,fit_max,expected", [(3, 30, 3), (8, 4, 3)])
+def test_pca_caps_components_by_pixels_and_fit_sample(pixels, fit_max, expected):
+    flux = np.random.default_rng(0).normal(size=(20, pixels)).astype(np.float32)
+    result = rm.pca_flux(flux, np.ones_like(flux, dtype=bool), n_pca=100, fit_max=fit_max)
+    assert result.shape == (20, expected) and np.isfinite(result).all()

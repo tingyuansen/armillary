@@ -1,5 +1,6 @@
 """Bridging makes the lattice connected; the neighbour lists are what the graph is built from."""
 import numpy as np
+import pytest
 from scipy.sparse.csgraph import connected_components
 from armillary import lattice as lm, distance as dm
 
@@ -22,3 +23,36 @@ def test_edge_weights_are_D():
     G, _ = lm.lattice(nbr, dist, X)
     for i in range(120):
         for j, d in zip(nbr[i], dist[i]): assert np.isclose(G[i, j], d)
+
+
+def test_identical_spectra_remain_connected_at_zero_distance():
+    X = np.zeros((4, 2), dtype=np.float32)
+    nbr, dist = lm.neighbours(X, k=1)
+    G, info = lm.lattice(nbr, dist, X)
+    assert info["components"] == 1 and info["bridges"] == 0
+    assert connected_components(G, directed=False)[0] == 1
+    np.testing.assert_array_equal(lm.geodesics(G, np.arange(4)), np.zeros((4, 4)))
+
+
+def test_zero_cost_bridge_joins_disconnected_identical_spectra():
+    X = np.zeros((4, 2), dtype=np.float32)
+    nbr = np.array([[1], [0], [3], [2]])
+    G, info = lm.lattice(nbr, np.zeros((4, 1), dtype=np.float32), X)
+    assert info["components"] == 2 and info["bridges"] == 1
+    assert info["bridge_edges"][0][2] == 0
+    assert G.nnz == 6 and np.all(G.data == 0)
+    np.testing.assert_array_equal(lm.geodesics(G, [0]), np.zeros((1, 4)))
+
+
+def test_zero_edges_preserve_mixed_distance_paths():
+    X = np.array([[0], [0], [2]], dtype=np.float32)
+    nbr, dist = lm.neighbours(X, k=1)
+    G, _ = lm.lattice(nbr, dist, X)
+    np.testing.assert_array_equal(lm.geodesics(G, [0]), [[0, 0, 2]])
+
+
+@pytest.mark.parametrize("k", [0, -1, 3, 1.5])
+@pytest.mark.parametrize("search", ["exact", "nndescent"])
+def test_invalid_neighbour_count_fails_before_search(k, search):
+    with pytest.raises(ValueError, match="positive integer"):
+        lm.neighbours(np.zeros((3, 2), dtype=np.float32), k, search=search)

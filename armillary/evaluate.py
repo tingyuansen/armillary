@@ -88,7 +88,8 @@ def pair_jitter(C, is_main, is_pair):
 
 def fewshot(C, Y, n, seeds=(0, 1, 2), propagate=None, k_ll=None):
     """One rung of the label ladder: n k-medoid training stars (one draw per seed), the rest predicted by the
-    local-linear map or, with `propagate(cal, Y_cal) -> P for every star`, through the graph.  Mean RMSE."""
+    local-linear map or, with `propagate(cal, Y_cal) -> P for every star`, through the graph.
+    Returns the mean central-68% half-width across the training draws."""
     errs = []
     for s in seeds:
         cal = pick_kmedoids(C, n, seed=s); rest = np.setdiff1d(np.arange(len(C)), cal)
@@ -146,7 +147,8 @@ def score_held(Y, P, held, trend, slice_=(-0.70, -0.35), alpha_on=None, min_slic
     """The score of predicted labels on the held-out stars `held`: the error (evaluate.error) and median offset (bias) per label, then on
     the stars of `held[alpha_on]` (all of them by default; the giants of a mixed held-out set) the R^2 and the
     correlation of the [alpha/M] residual about the trend, and the two-Gaussian separation on the [Fe/H] slice
-    when it holds at least `min_slice` stars."""
+    when it holds at least `min_slice` stars. The legacy `rmse` key stores error(),
+    the central-68% half-width, rather than the root-mean-square error."""
     held = np.asarray(held); e = P[held] - Y[held]; rms = error(e); bias = np.median(e, 0)
     h = held if alpha_on is None else held[np.asarray(alpha_on)]
     rt = Y[h, 3] - trend(Y[h, 2]); rp = P[h, 3] - trend(P[h, 2])
