@@ -8,8 +8,8 @@ D over the edges of the path.  The coordinates (coordinates.py) are then built f
 
     neighbours    the k nearest neighbours of every star under D, by the exact blockwise search of
                   distance.pairwise or by nearest-neighbour descent (pynndescent, manhattan metric, seeded),
-                  chosen by search="exact" | "nndescent".  Both return the same (nbr, dist) arrays, sorted by
-                  the same float32 L1 distance, the star itself excluded.
+                  chosen by search="exact" | "nndescent".  Both return (nbr, dist) arrays of the same form, sorted
+                  by the same float32 L1 distance, the star itself excluded.
     lattice       the graph G: every star joined to its k nearest neighbours, the edges symmetrised and weighted
                   by D; every separate piece joined to the largest piece by the single shortest edge between them.
     geodesics     the geodesic distances from a set of landmarks, by Dijkstra's algorithm on G.
@@ -39,9 +39,9 @@ def neighbours(features, k, search="exact", block=256, seed=0, verbose=False):
 def _nndescent(features, k, seed=0, verbose=False):
     """Nearest-neighbour descent (Dong et al. 2011) on the feature vectors under the manhattan (L1) metric.
 
-    The descent starts from random neighbour lists and improves them by testing the neighbours of each star's current
-    neighbours, so it never evaluates every pair.  Here it supplies the candidate lists only: every distance is then
-    recomputed with the exact kernel (_l1_cand, the same float32 kernel the exact search uses) and each row re-sorted on
+    The descent starts from candidate lists (pynndescent seeds them with random-projection trees) and improves them by
+    testing the neighbours of each star's current neighbours, so it never evaluates every pair.  Here it supplies the candidate lists only: every distance is then
+    recomputed with the exact kernel (_l1_cand, the same float32 arithmetic as the exact search) and each row re-sorted on
     those values.  The result therefore has the exact search's semantics: sorted by the same float32 L1 distance, the
     star itself excluded, and distances bit-identical wherever the neighbour is the same.  A row the descent left short
     (a heap slot never filled, marked -1) is replaced by that star's exact neighbours.

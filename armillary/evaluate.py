@@ -11,9 +11,9 @@ from scipy.spatial import cKDTree
 
 def error(e, axis=0):
     """The error statistic: half the width of the central 68 per cent of the differences e (the 16th to 84th
-    percentile range over two).  For Gaussian differences this is the standard deviation; for real ones it is the width
-    of a Gaussian of the same core, insensitive to the few stars a graph places wrongly, which would inflate an rms.
-    NaNs are ignored.  Every error the tutorial quotes uses this function."""
+    percentile range over two).  For Gaussian differences this is very nearly the standard deviation (0.994 sigma); for
+    real ones it is the width of a Gaussian of the same core, insensitive to the few stars a graph places wrongly, which
+    would inflate an rms.  It measures the spread only: a constant offset gives zero.  NaNs are ignored.  Every error the tutorial quotes uses this function."""
     e = np.asarray(e, float); lo, hi = np.nanpercentile(e, [16, 84], axis=axis); return (hi - lo) / 2
 
 
@@ -27,8 +27,8 @@ def error_r2(Y, P):
 def linear_probe_r2(C, Y):
     """The linear probe: R^2 of the affine map c -> A c + b from the coordinates C [N, d] to the labels Y [N, L],
     fitted by least squares and scored on the same stars (one value per label).  Coordinates built from distances are
-    defined only up to a rotation, so no single axis is privileged; the probe asks how closely SOME rotation and scale of
-    them follows each label.  1 for an exact linear relation, 0 for none."""
+    defined only up to a rotation, so no single axis is privileged; the probe asks how closely the best affine combination
+    of them follows each label.  1 for an exact linear relation, 0 for none."""
     A = np.column_stack([np.ones(len(C)), C]); coef, *_ = np.linalg.lstsq(A, Y, rcond=None); P = A @ coef
     return 1 - ((Y - P) ** 2).sum(0) / ((Y - Y.mean(0)) ** 2).sum(0)
 

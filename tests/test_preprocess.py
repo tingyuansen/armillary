@@ -1,5 +1,6 @@
 """The continuum steps: masked non-finite pixels must not affect the good pixels or the values that fill the bad ones."""
 import numpy as np
+import pytest
 from armillary import preprocess as pp
 
 
@@ -22,3 +23,11 @@ def test_fill_bad_uses_only_good_values_and_handles_empty_columns():
     good = np.array([[True, False, False], [True, True, False], [False, True, False]])
     expected = np.array([[1, 5, 1], [3, 4, 1], [2, 6, 1]], dtype=np.float32)
     np.testing.assert_array_equal(pp.fill_bad(flux, good), expected)
+
+
+def test_segment_chunks_needs_one_count_per_segment():
+    """A chunking must give a count for every segment of the data: a missing segment raises, instead of being silently left out."""
+    seg = np.repeat([0, 1, 2], 20)
+    assert len(pp.segment_chunks(seg, (2, 2, 2))) == 6
+    with pytest.raises(ValueError, match="one count per segment"): pp.segment_chunks(seg, (4,))
+

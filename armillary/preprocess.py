@@ -31,7 +31,7 @@ def running_continuum(flux, good, seg_id, window_px=300, q=0.90, step=None):
     f = np.asarray(flux, np.float64); good = np.asarray(good, bool); N, P = f.shape; cont = np.ones((N, P))
     step = step or max(window_px // 4, 8); h = window_px // 2
     for s in np.unique(seg_id):
-        # the pixel range of this segment, and knots that keep half a window clear of its ends
+        # the pixel range of this segment, and knots that keep a quarter window clear of its ends
         idx = np.where(seg_id == s)[0]; a, b = idx[0], idx[-1] + 1
         knots = np.arange(a + h // 2, b - h // 2, step)
         if len(knots) < 2: knots = np.array([a, b - 1])                      # a short segment: its two end pixels
@@ -82,7 +82,7 @@ def _running_quantile_segment(f, good, knots, a, b, h, q):
 
 def prepare(flux, err, good, seg_id, window_px=100, q=0.90, min_cover=0.9, lo=0.0, hi=1.5):
     """The first step for spectra with their instrumental response.  Divide by the running continuum, drop the
-    pixels usable in fewer than a fraction min_cover of the stars, and clean the rest: a pixel is good only where the
+    pixels usable in a fraction min_cover of the stars or less, and clean the rest: a pixel is good only where the
     normalised flux is finite and lies in (lo, hi).  The pixel cut is common to all stars, so that every star keeps the
     same wavelength grid and the chunks mean the same thing for all of them.
 
@@ -100,10 +100,14 @@ def prepare(flux, err, good, seg_id, window_px=100, q=0.90, min_cover=0.9, lo=0.
 
 def segment_chunks(seg_id, per_segment):
     """The chunk bounds [(a, b), ...] of one chunking: per_segment[s] equal-width chunks in detector segment s
-    (segments numbered from 0, every segment in per_segment must have pixels).  Several chunkings, from coarse to
-    fine, give the hierarchy of scales the distance is built on: a wide chunk compares the broad features of two
-    spectra, a narrow one their individual lines."""
+    (segments numbered from 0).  per_segment must give one count for every segment of the data, and every segment it
+    names must have pixels; otherwise ValueError, so that no segment is silently left out of the distance.  Several
+    chunkings, from coarse to fine, give the hierarchy of scales the distance is built on: a wide chunk compares the
+    broad features of two spectra, a narrow one their individual lines."""
     seg_id = np.asarray(seg_id); bounds = []
+    if len(seg_id) and int(seg_id.max()) >= len(per_segment):
+        raise ValueError(f"the pixels are in segments 0 to {int(seg_id.max())}, but {tuple(per_segment)} gives chunk counts "
+                         f"for {len(per_segment)} segment(s): give one count per segment")
     for s, n in enumerate(per_segment):
         idx = np.where(seg_id == s)[0]
         if len(idx) == 0: raise ValueError(f"segment {s} has no pixels")

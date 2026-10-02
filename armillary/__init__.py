@@ -21,4 +21,4 @@ Ting & Saad (2026), Armillary: a label-free coordinate system for stellar spectr
 """
 from . import preprocess, distance, lattice, coordinates, refine, labels, evaluate  # noqa: F401
 from .pipeline import Config, fit, Fit  # noqa: F401
-__version__ = "0.3.0"
+__version__ = "0.3.1"

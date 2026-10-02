@@ -95,10 +95,10 @@ def cumulative_curve(fn_chunk, good_chunk, err_chunk=None):
 
     With `err_chunk` (Config.error_weights), each pixel's depth is multiplied by a reliability weight w, the inverse
     variance 1 / sigma^2 of the pixel normalised to a mean of one over the good pixels of the chunk.  A noisy pixel then
-    carries less of the chunk's absorption, while the total keeps its scale.  This helps where the errors carry
-    structure of their own (sky lines, detector features).  It hurts where the errors follow the photon noise: the
-    inverse variance is then largest in the line cores, so the weights move absorption from the weak lines into the
-    strong ones.
+    carries less of the chunk's absorption, while the total keeps its scale (only the relative errors matter).  Use it
+    where the errors carry structure of their own (sky lines, detector features).  It is off by default because, where
+    the errors follow the photon noise, the inverse variance is largest in the line cores, so the weights move
+    absorption from the weak lines into the strong ones.
 
     rho = depth / total and F = cumsum(rho), so F rises from ~0 to 1 at the last pixel.  Guard: a chunk whose net
     absorption |total| is below 1e-3 is divided by 1e-3 instead, so that a chunk with no absorption (or with positive
@@ -155,9 +155,10 @@ def build_features(fn, good, err, chunkings, n_ref=500, seed=0, block=256, log=N
     distances by which two stars differ in it.  Then |Phi_i - Phi_j|_1 = sum over every chunk of every chunking of
     W1^(c)(i, j) / median W1^(c), with W1 the sum over the pixels of |F_i - F_j|.
 
-    The median is taken over every pair among `n_ref` stars drawn at random (seed `seed`), n_ref (n_ref - 1) / 2 pairs,
-    the same stars for every chunk; `ref_index` names those stars explicitly instead.  A few hundred stars give a
-    stable median at any sample size, so this step costs the same for a thousand stars as for a million."""
+    The median is taken over every pair among min(n_ref, N) stars drawn at random (seed `seed`), n_ref (n_ref - 1) / 2
+    pairs, the same stars for every chunk; `ref_index` names those stars explicitly instead.  A few hundred stars give
+    a stable median at any sample size, so the medians cost the same for a thousand stars as for a million (the curves
+    themselves cost O(N P))."""
     t0 = time.time(); fn = np.asarray(fn, np.float32); good = np.asarray(good, bool); N = len(fn)
     err = None if err is None else np.asarray(err, np.float32); assert err is None or err.shape == fn.shape, (err.shape, fn.shape)
     # the reference stars of the medians

@@ -16,7 +16,7 @@ a few dominant eigenvalues suggest how many coordinates to keep.
     landmark_mds    the same on the m x m table among m landmarks; every other star is then placed from its geodesic
                     distances to the landmarks by the linear formula of de Silva & Tenenbaum (2004), as a position is
                     fixed from its distances to a few known points.  With every star a landmark it equals
-                    classical_mds to machine precision (tested).
+                    classical_mds to machine precision, up to the sign of each axis (tested).
 
 The eigenvalues are returned so that the number of coordinates to keep can be read from them; d is a parameter."""
 import numpy as np
@@ -24,7 +24,7 @@ from scipy.linalg import eigh
 
 
 def classical_mds(Dg, d, n_eig=12):
-    """Coordinates from a full distance table Dg [N, N].  Returns C [N, d] and the n_eig largest eigenvalues of B."""
+    """Coordinates from a full distance table Dg [N, N].  Returns C [N, min(d, n_eig)] and the n_eig largest eigenvalues of B."""
     N = len(Dg); D2 = np.asarray(Dg, np.float64) ** 2; rm = D2.mean(1, keepdims=True)
     # double centring written out: subtract the row and column means, add back the grand mean
     B = -0.5 * (D2 - rm - rm.T + D2.mean())                                  # = -1/2 J D2 J
@@ -43,8 +43,8 @@ def landmark_mds(Dl, landmarks, d, n_eig=12):
 
         c_i = -1/2 L^+ (d_i^2 - mean_l d_l^2),   L^+ = (V / sqrt(w))^T,
 
-    with d_i^2 the vector of its squared geodesic distances to the landmarks and mean_l d_l^2 the mean squared
-    distance from each landmark to the others.  The bracket is the star's row of the centred table of squared
+    with d_i^2 the vector of its squared geodesic distances to the landmarks and mean_l d_l^2 the vector of the mean
+    squared distance from each landmark to all the landmarks (its own zero included).  The bracket is the star's row of the centred table of squared
     distances, and L^+ turns it into coordinates (the inner products with the landmark coordinates, divided by the
     eigenvalues).  The eigendecomposition is of an m x m matrix, so the cost no longer grows as N^3.
 

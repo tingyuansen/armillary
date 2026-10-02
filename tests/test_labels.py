@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 from armillary import refine as rm, labels as lb, distance as dm
+from armillary.pipeline import Config, Fit
 
 
 def _case(n=400, seed=1):
@@ -53,3 +54,12 @@ def test_density_draw_favours_sparse_regions():
     assert len(np.unique(pick)) == 100 and (pick >= 900).mean() > 0.2                 # the halo has 10 percent of the stars
     assert np.array_equal(pick, lb.density_draw(C, 100, seed=1))
     cand = np.arange(0, 1000, 2); assert np.isin(lb.density_draw(C, 50, candidates=cand), cand).all()
+
+
+def test_fit_propagate_rejects_bad_indices_with_valueerror():
+    """Fit.propagate checks the indices before it uses them: out of range, non-integer or two-dimensional indices raise ValueError."""
+    W, Y, cal = _case(); F = Fit(Config(k_refine=12)); F.W = W
+    for bad in ([len(Y) + 5], [0.5], [[0, 1]]):
+        with pytest.raises(ValueError): F.propagate(Y, labelled_index=bad)
+    assert F.propagate(Y, labelled_index=cal).shape == Y.shape
+

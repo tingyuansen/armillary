@@ -16,6 +16,8 @@ def test_bridging_connects_pieces():
     for i, j, w in info["bridge_edges"]:                       # each bridge is the shortest edge to the largest piece
         d = np.abs(X[i] - X[j]).sum(); assert np.isclose(w, d, rtol=1e-5)
         assert i >= 200 and j < 200
+        piece = np.arange(200, 350) if i < 350 else np.arange(350, 410)     # the stars of the bridged piece
+        assert np.isclose(w, np.abs(X[piece][:, None] - X[None, :200]).sum(-1).min(), rtol=1e-5)
     Dl = lm.geodesics(G, [0, 250, 380]); assert np.isfinite(Dl).all()
 
 

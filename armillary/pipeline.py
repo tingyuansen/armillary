@@ -1,20 +1,20 @@
 """The whole method as one function.
 
 fit(flux, good, segments, config) runs every step from the spectra to the refined coordinates and returns a Fit, which
-holds every intermediate product, the timings of every step, and the label transfer as Fit.propagate().  Config holds
+holds the intermediate products of every step (all but the full table of geodesic distances), the timings of every step, and the label transfer as Fit.propagate().  Config holds
 every parameter.  The same implementation is used at every sample size; only the neighbour search and the number of
 landmarks change for large samples.
 
 The steps of fit(), and the module of each:
 
-    1. the normalised flux           preprocess.prepare (if continuum="running"), then preprocess.local_renormalise
-    2. the feature vectors           distance.build_features: their L1 distance is the spectral distance D
-    3. the neighbours and the graph  lattice.neighbours, lattice.lattice
-    4. the geodesic distances        lattice.geodesics, from the landmarks
-    5. the coordinates               coordinates.landmark_mds
-    6. the refinement                refine.pca_flux, refine.lle_weights, refine.refine
+    1. the normalised flux                     preprocess.prepare (if continuum="running"), then preprocess.local_renormalise
+    2. the cumulative curves and the distance  distance.build_features: the feature vectors, whose L1 distance is D
+    3. the graph and the geodesic distances    lattice.neighbours, lattice.lattice, lattice.geodesics (from the landmarks)
+    4. the coordinates                         coordinates.landmark_mds
+    5. the refinement                          refine.pca_flux, refine.lle_weights, refine.refine
 and then, on the Fit,
-    7. the label transfer            Fit.propagate -> labels.propagate, through the refinement's weights
+    6. the label transfer                      Fit.propagate -> labels.propagate, through the refinement's weights
+These are the six steps of the README.
 """
 import time, json, dataclasses
 from dataclasses import dataclass, field
@@ -25,7 +25,8 @@ from . import preprocess as pp, distance as dm, lattice as lm, coordinates as cm
 
 @dataclass
 class Config:
-    """Every parameter of the method.  The defaults are the values of Ting & Saad (2026).
+    """Every parameter of the method.  The method's settings default to the values of Ting & Saad (2026); the
+    default chunkings (10, 20 and 40 chunks on one detector segment) are a starting point to adapt to the data.
 
     The defaults suit continuum-normalised spectra on one detector segment, with every star a landmark and an exact
     neighbour search, which is fine up to a few tens of thousands of stars.  For larger samples set n_landmarks=800 and
@@ -40,24 +41,24 @@ class Config:
     renorm_chunking: tuple = None      # the chunking whose chunks the local straight-line continuum is fitted in; None: the middle one of `chunkings`
     renorm_q: float = 0.85             # the fit uses the pixels at or above this quantile of each chunk
     # --- step 2, the distance
-    chunkings: tuple = ((10,), (20,), (40,))   # one tuple per chunking, coarse to fine; each gives the number of chunks in every detector segment, e.g. ((4, 4, 3), (8, 7, 5)) for three segments
+    chunkings: tuple = ((10,), (20,), (40,))   # one tuple per chunking, coarse to fine; each gives the number of chunks in every detector segment (one count per segment of the data), e.g. ((4, 4, 3), (8, 7, 5)) for three segments
     error_weights: bool = False        # weight each pixel's depth by its inverse variance in the curves: True where the errors carry structure of their own (sky lines, detector features), False where they follow the photon noise
     n_ref: int = 500                   # stars whose pairs give the median W1 of every chunk (n_ref (n_ref-1)/2 pairs)
     # --- step 3, the neighbour graph (the lattice in the code)
     k_lattice: int = 30                # neighbours per star in the graph the geodesics run on
     search: str = "exact"              # "exact" (every pair; up to a few tens of thousands of stars) | "nndescent" (approximate; large samples)
     n_landmarks: int = None            # landmarks for the geodesics and the scaling; None: every star (memory and time grow as N^2)
-    # --- step 5, the coordinates
+    # --- step 4, the coordinates
     d: int = 4                         # the number of coordinates; read it from Fit.eigenvalues
     n_eig: int = 12                    # how many eigenvalues fit returns, to choose d from
-    # --- step 6, the refinement
+    # --- step 5, the refinement
     n_pca: int = 30                    # the weights are fitted on this many principal components of the normalised flux (bad pixels at the pixel's sample mean)
     pca_fit_max: int = 30000           # the components are fitted on at most this many stars drawn at random, and applied to all
     k_refine: int = 100                # neighbours under D of the one weight matrix W
     reg: float = 1e-3                  # the ridge on the local Gram matrix G, times trace(G)
     rho: float = 0.003                 # anchor strength of the refinement, relative to tr[(I-W)^T(I-W)]/N; smaller pulls harder toward the neighbour relations; the paper chose it without labels, from repeat spectra of the same stars
-    # --- step 7, the transfer: the same W as the refinement
-    k_prop: int = None                 # None: k_refine, and the refinement's W is reused; a value builds a second W over that many neighbours
+    # --- step 6, the transfer: the same W as the refinement
+    k_prop: int = None                 # None (or a value equal to k_refine): the refinement's W is reused; another value builds a second W over that many neighbours
     mu: float = 3.0                    # anchor strength of the transfer, relative to tr[(I-W)^T(I-W)]/N as for rho; larger holds the training stars closer to their labels
     # --- implementation
     seed: int = 0                      # every random draw (median stars, landmarks, PCA subset, nn-descent)
@@ -105,9 +106,10 @@ class Fit:
 
     # ---- the transfer
     def propagation_weights(self, k_prop=None):
-        """W for the transfer.  With k_prop None or equal to k_refine, the refinement's W itself (the one weight
-        matrix, as in the paper); otherwise a second matrix over k_prop neighbours under D by the same rule, built once
-        and cached.  k_prop cannot exceed the neighbours fit searched (k_max)."""
+        """W for the transfer.  k_prop None takes the config's k_prop (k_refine if that is None).  When the resulting
+        k_prop equals k_refine, this is the refinement's W itself (the one weight matrix, as in the paper); otherwise a
+        second matrix over k_prop neighbours under D by the same rule, built once and cached.  k_prop cannot exceed the
+        neighbours fit searched (k_max)."""
         c = self.config; k_prop = k_prop or c.k_prop_eff
         if k_prop == c.k_refine and getattr(self, "W", None) is not None: return self.W
         if k_prop in self._Wprop: return self._Wprop[k_prop]
@@ -121,9 +123,14 @@ class Fit:
 
         labels [N, L]: one row per star of the fit (any values on the unlabelled rows; [L, N] is accepted too);
         labelled_index: the rows whose labels are known.  mu and k_prop default to the config's.  Returns Y [N, L].
-        The relative residuals of the solve are kept on Fit.propagate_residual."""
+        The relative residuals of the solve are kept on Fit.propagate_residual.  Invalid indices raise ValueError
+        (the remaining checks are those of labels.propagate)."""
         c = self.config; W = self.propagation_weights(k_prop)
         labels = np.atleast_2d(np.asarray(labels, np.float64)); labels = labels if labels.shape[0] == W.shape[0] else labels.T
+        # check the indices here, before they index `labels`, so that a bad index is a ValueError and not an IndexError
+        labelled_index = np.asarray(labelled_index)
+        if labelled_index.ndim != 1 or not np.issubdtype(labelled_index.dtype, np.integer) or np.any(labelled_index >= W.shape[0]):
+            raise ValueError("labelled_index must be a one-dimensional array of integer indices in range")
         Y, res = lb.propagate(W, labelled_index, labels[labelled_index], mu=c.mu if mu is None else mu, tol=c.cg_tol, maxiter=c.cg_maxiter, log=log)
         self.propagate_residual = res; return Y
 
@@ -142,12 +149,14 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
     flux, good  [N, P] float32 and bool: the spectra on a common wavelength grid, and False on the bad pixels.
     segments    [P] int: the detector segment of every pixel, numbered from 0, so that no chunk straddles a gap.
     config      a Config (default Config()).
-    err         [N, P]: the pixel standard deviations, used by continuum="running" and error_weights=True.  If omitted,
-                an array of ones is used.  It is divided by the continuum and kept on the Fit.
+    err         [N, P]: the pixel standard deviations.  They affect the result only through error_weights=True; the
+                continuum steps just divide them by the continuum, and the result is kept on the Fit.  If omitted, an
+                array of ones is used, which with error_weights=True makes the weights follow the fitted continuum rather
+                than the noise, so give err whenever error_weights=True.
     log         a function that receives one progress line per step (default print; None for silence).
     stop        "features" returns after the feature vectors (to check a neighbour search); "neighbours" or "lattice"
                 after the neighbour search and the graph, with the projections the weights need (the label transfer
-                needs only the graph, not the coordinates); None runs everything.
+                needs only the neighbours and the projections, not the coordinates); None runs everything.
     Returns a Fit."""
     c = config or Config(); t_all = time.time(); F = Fit(c); lines = []
     # every progress line is time-stamped from the start of the fit, kept on the Fit, and passed to `log`
@@ -193,7 +202,7 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
         t = time.time(); F.X_pca = rm.pca_flux(F.fn, good, c.n_pca, fit_max=c.pca_fit_max, seed=c.seed); F.timings["pca"] = time.time() - t
         F.timings["total"] = time.time() - t_all; F.log_lines = lines; say(f"stopped after the {stop} ({F.timings['total']:.0f} s)"); return F
 
-    # ---- 4-5. geodesics from the landmarks and the coordinates
+    # ---- 3-4. the geodesics from the landmarks (the end of step 3), and the coordinates
     # every star is a landmark unless n_landmarks is set and smaller than N; then n_landmarks stars drawn at random
     t = time.time()
     F.landmarks = np.arange(N) if (c.n_landmarks is None or c.n_landmarks >= N) else np.random.default_rng(c.seed).permutation(N)[:c.n_landmarks]
@@ -202,7 +211,7 @@ def fit(flux, good, segments, config=None, err=None, log=print, stop=None):
     t = time.time(); F.C_geo, F.eigenvalues = cm.landmark_mds(Dl, F.landmarks, c.d, c.n_eig); F.timings["mds"] = time.time() - t
     say(f"coordinates: d = {c.d}; eigenvalue ratios {np.round(F.eigenvalues[:8] / max(F.eigenvalues[0], 1e-300), 3).tolist()}, {F.timings['mds']:.1f} s")
 
-    # ---- 6. the refinement: the projections, the weights over k_refine neighbours, then the sparse solve
+    # ---- 5. the refinement: the projections, the weights over k_refine neighbours, then the sparse solve
     t = time.time(); F.X_pca = rm.pca_flux(F.fn, good, c.n_pca, fit_max=c.pca_fit_max, seed=c.seed)
     F.timings["pca"] = time.time() - t
     t = time.time(); F.W = rm.lle_weights(F.X_pca, F.nbr[:, :c.k_refine], reg=c.reg); F.timings["lle"] = time.time() - t

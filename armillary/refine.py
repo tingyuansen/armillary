@@ -59,7 +59,7 @@ def lle_weights(X, nbr, reg=1e-3, block=None):
     I = np.arange(k)
     for lo in range(0, N, block):
         hi = min(lo + block, N)
-        Z = X[nbr[lo:hi]] - X[lo:hi, None, :]                 # (B, k, P): neighbour minus star
+        Z = X[nbr[lo:hi]] - X[lo:hi, None, :]                 # (B, k, n): neighbour minus star
         G = Z @ Z.transpose(0, 2, 1)                           # (B, k, k): the local Gram matrices
         tr = np.trace(G, axis1=1, axis2=2)
         G[:, I, I] += reg * np.where(tr > 0, tr, 1.0)[:, None]   # the ridge on the diagonal (1 if the neighbours coincide)

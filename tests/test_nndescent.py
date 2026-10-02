@@ -5,7 +5,7 @@ from armillary import preprocess as pp, distance as dm, lattice as lm
 
 @pytest.mark.slow
 def test_nndescent_overlap_at_k100(synthetic_all):
-    """The approximate lists must share more than 99 per cent of their neighbours with the exact ones, and give identical distances wherever the neighbour is the same."""
+    """The approximate lists must share more than 99 per cent of their neighbours with the exact ones, and give the same distances wherever the neighbour is the same."""
     flux = synthetic_all["flux"]; good = np.ones(flux.shape, bool); chunks = pp.segment_chunks(np.zeros(flux.shape[1], int), (32,))
     fn = pp.local_renormalise(flux, chunks, good)
     Phi, _ = dm.build_features(fn, good, None, [chunks])
