@@ -1,28 +1,37 @@
 # Armillary
 
-Armillary builds a coordinate system for a spectroscopic survey from the spectra alone, and then transfers labels (effective temperature, surface gravity, abundances, or anything else measured for a few stars) to every other star through that coordinate system. It needs no model spectra and no training set to place the stars; labels enter only at the end, and a few dozen labelled stars can recover the broad stellar-parameter structure of a survey of hundreds of thousands. The method is described in Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*; this repository is the package that implements it, with a tutorial on synthetic spectra.
+Armillary makes a coordinate system for a set of stellar spectra from the spectra alone. It then transfers labels from a few labelled stars to all the other stars through these coordinates. The labels can be effective temperature, surface gravity, abundances, or other measured quantities.
+
+The method uses no model spectra and no training set to put the stars in the coordinates. Labels are necessary only for the last step. In the paper, a few dozen labelled stars give the main stellar-parameter structure of a sample of hundreds of thousands of stars.
+
+Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*, gives the method. This repository contains the package and a tutorial on synthetic spectra.
 
 ![The seven steps of Armillary](examples/armillary_schematic.png)
 
-*From left to right: two spectra and their cumulative absorption curves, whose separation is the distance between them; the table of distances between all pairs; the neighbour graph on the manifold the spectra trace out; a geodesic along it; the coordinates that reproduce the geodesic distances; the same after the locally linear refinement; and labels carried from four labelled stars (the orange stars) to every other star.*
+*The panels show the steps from left to right. Two spectra and their cumulative absorption curves: the area between the curves is the distance. The table of the distances between all the pairs. The neighbour graph on the manifold of the spectra. A geodesic along the graph. The coordinates from the geodesic distances. The same coordinates after the refinement. The labels of four labelled stars (the orange stars), transferred to all the other stars.*
 
 ## How it works
 
-Every spectrum is normalised to a local continuum and turned into a set of cumulative absorption curves, one per wavelength chunk at several chunk sizes; the distance between two spectra is the sum over chunks of the area between their curves (a signed cumulative-profile distance inspired by one-dimensional Wasserstein distance). Negative depths above the continuum are retained, so the curves need not be probability cumulative distributions. Each star is joined to its nearest neighbours under that distance, the graph is made connected, and distances along the graph become coordinates by landmark multidimensional scaling. Refinement balances agreement with local linear combinations of neighbouring spectra against staying near those initial coordinates. Labels are transferred using the same local weights, with a penalty for disagreement with the known labels.
+1. **The spectra.** Armillary divides each spectrum by a local continuum. It then makes one cumulative absorption curve for each wavelength chunk, with chunks of different widths.
+2. **The distance.** The distance between two spectra is the sum of the areas between their curves. Each chunk is in units of its median over pairs of stars. This distance is the Wasserstein distance between the absorption profiles, extended to negative depths. Thus the noise above the continuum stays and is not clipped.
+3. **The graph.** Each star is joined to its nearest neighbours under the distance, and the graph is made connected. The distances along the graph are the geodesic distances.
+4. **The coordinates.** Landmark multidimensional scaling changes the geodesic distances into coordinates.
+5. **The refinement.** Each star is a weighted sum of its neighbours. The refinement makes the coordinates agree with these weights, and keeps them near the coordinates of step 4.
+6. **The labels.** The labels go from the labelled stars to all the other stars, through the same weights. A penalty keeps each labelled star near its known labels.
 
-| step | module | what it computes |
+| step | module | what it calculates |
 | --- | --- | --- |
-| 1 | `armillary.preprocess`, `armillary.distance` | the locally normalised flux; the feature vectors whose L1 distance is the spectral distance |
-| 2 | `armillary.lattice` | the k-nearest-neighbour graph, connected, and geodesic distances from a set of landmarks |
-| 3 | `armillary.coordinates` | the coordinates, by landmark multidimensional scaling |
-| 4 | `armillary.refine` | the locally linear refinement of the coordinates |
-| 5 | `armillary.labels` | the label transfer through the same local weights |
-| | `armillary.pipeline` | `Config`, `fit` and `Fit`: the whole chain with timings |
-| | `armillary.evaluate` | the error statistic and the probes used to score coordinates and transferred labels |
+| 1, 2 | `armillary.preprocess`, `armillary.distance` | the normalised flux; the feature vectors, whose L1 distance is the distance between the spectra |
+| 3 | `armillary.lattice` | the connected k-nearest-neighbour graph, and the geodesic distances from a set of landmarks |
+| 4 | `armillary.coordinates` | the coordinates, by landmark multidimensional scaling |
+| 5 | `armillary.refine` | the locally linear refinement of the coordinates |
+| 6 | `armillary.labels` | the label transfer through the same weights, and the selection of the stars to label |
+| | `armillary.pipeline` | `Config`, `fit` and `Fit`: all the steps in one function, with the time of each step |
+| | `armillary.evaluate` | the error statistic and the scores of coordinates and transferred labels |
 
 ## Installation
 
-Python 3.10 or newer.
+Use Python 3.10 or later.
 
 ```bash
 git clone https://github.com/tingyuansen/armillary.git
@@ -30,7 +39,9 @@ cd armillary
 python -m pip install -e .
 ```
 
-This installs the package and its dependencies (NumPy, SciPy, scikit-learn, numba, pynndescent). The distance kernels are compiled with numba on first use; `Config.threads` or the environment variable `NUMBA_NUM_THREADS` sets the number of cores. For the tests and the tutorial:
+This command installs the package and the packages that it uses: NumPy, SciPy, scikit-learn, numba and pynndescent. numba compiles the distance kernels when you use them for the first time. To set the number of cores, use `Config.threads` or the environment variable `NUMBA_NUM_THREADS`.
+
+To run the tests and the tutorial, install the optional packages:
 
 ```bash
 python -m pip install -e ".[test,tutorial]"
@@ -45,68 +56,79 @@ import numpy as np, armillary as ar
 
 z = np.load("examples/synthetic_spectra.npz")
 flux = z["flux"].astype(np.float32)          # [N, P] continuum-normalised flux
-good = np.ones(flux.shape, bool)             # [N, P] usable pixels
-segments = np.zeros(flux.shape[1], int)      # [P] detector segment of every pixel
+good = np.ones(flux.shape, bool)             # [N, P] good pixels
+segments = np.zeros(flux.shape[1], int)      # [P] the detector segment of each pixel
 
-F = ar.fit(flux, good, segments, ar.Config.paper_synthetic())
+config = ar.Config(chunkings=((32,),), d=3, k_refine=50)   # one chunking of 32 chunks, three coordinates
+F = ar.fit(flux, good, segments, config)
 C = F.C                                      # the coordinates, [N, d]
 
-labelled = np.arange(0, len(flux), 42)       # the stars whose labels are known
-Y = F.propagate(z["labels"], labelled_index=labelled)   # labels for every star, [N, 3]
+labelled = ar.labels.density_draw(F.C, 100)  # the stars to label
+Y = F.propagate(z["labels"], labelled_index=labelled)   # the labels of all the stars, [N, 3]
 ```
 
-`fit` returns a `Fit` holding every intermediate product (the normalised flux, the feature vectors, each star's neighbours and distances, the graph, the eigenvalues, the unrefined and refined coordinates, the timings of every step). `Fit.propagate` transfers any table of labels; `Fit.save(path)` writes the coordinates and what is needed to draw or re-score them. This archive does not restore a `Fit` or its propagation weights; keep the in-memory `Fit` to transfer additional labels.
+`fit` returns a `Fit`, which holds all the intermediate products. These are the normalised flux, the feature vectors, the neighbours of each star with their distances, and the graph. They also include the eigenvalues, the coordinates before and after the refinement, and the time of each step.
+
+`Fit.propagate` transfers a table of labels. `Fit.save(path)` writes the coordinates and the data that is necessary to plot or score them again. This file does not contain the full `Fit`. To transfer more labels later, keep the `Fit` in memory.
 
 ## The tutorial
 
-[`armillary_tutorial.ipynb`](armillary_tutorial.ipynb) runs the whole method on the grid of 4,675 synthetic spectra in `examples/synthetic_spectra.npz` (calculated with [Payne Zero](https://github.com/tingyuansen/payne-zero), 480 to 680 nm at a resolving power of 10,000: every combination of effective temperature from 4000 to 7000 K, surface gravity from 1 to 5 and metallicity from −2 to +0.5, each with its true labels). It shows, in the figures of the paper:
+[`armillary_tutorial.ipynb`](armillary_tutorial.ipynb) applies the full method to the 4,675 synthetic spectra in `examples/synthetic_spectra.npz`. [Payne-Zero](https://github.com/tingyuansen/payne-zero) calculated these spectra from 480 to 680 nm, at a resolving power of 10,000. The grid goes from 4000 to 7000 K in effective temperature, from 1 to 5 in surface gravity, and from −2 to +0.5 in metallicity. Each spectrum has its true labels.
 
-1. the showcase: the label grid recovered in the coordinates with no label used, at three metallicities (the paper's Figure 3);
-2. the seven steps of the schematic above, and where each product sits on the `Fit`;
-3. labels transferred from 50 stars to the other 4,625; the same at a signal-to-noise ratio of 30; and, with noise that varies across the spectrum and sky-line pixels, the error-weighted distance (`error_weights=True`) against the plain one;
-4. how the calls apply to a real survey.
+The tutorial shows these items:
 
-It runs in about a minute on a laptop. `examples/tutorial_figures.py` holds the figures and `examples/figure_style.py` the paper's typography, for reuse.
+1. The showcase: the coordinates recover the label grid without labels, at three metallicities. This is Figure 3 of the paper, which uses the same grid at a resolving power of 20,000.
+2. The seven steps of the schematic above, and the attribute of the `Fit` that holds each product.
+3. The labels from 50 labelled stars, transferred to the other 4,625 stars. Then the same transfer at a signal-to-noise ratio of 30.
+4. Noise that changes along the spectrum, with sky-line pixels: the error-weighted distance against the plain distance.
+5. How to use the same calls on your own spectra.
+
+The tutorial runs in about two minutes on a laptop. `examples/tutorial_figures.py` makes the figures, and `examples/figure_style.py` sets their style.
 
 ## Configuration
 
-Every parameter of the method is a field of `Config`, documented in `armillary/pipeline.py`. The presets provide the paper's method configurations; their selection used the validation procedures described in the paper. For a fixed configuration, coordinate construction uses no labels:
+`Config` holds all the parameters of the method, and `armillary/pipeline.py` describes each field. The defaults are the values of the paper. For a fixed configuration, Armillary uses no labels to make the coordinates.
 
-| preset | survey | what it sets |
+Change these fields for your data:
+
+| field | default | when to change it |
 | --- | --- | --- |
-| `Config()` = `Config.paper_apogee()` | APOGEE, pipeline-normalised spectra | three detector segments, chunkings of (4, 4, 3), (8, 7, 5) and (16, 14, 10) chunks per segment, four coordinates, every star a landmark, exact neighbour search |
-| `Config.paper_apogee_survey()` | APOGEE at survey scale | 800 landmarks, nearest-neighbour descent, `mu = 3` for the transfer |
-| `Config.paper_desi()` | DESI, spectra with their instrumental response | a running continuum first, four chunkings, the absorption weighted by the pixel errors, 800 landmarks, nearest-neighbour descent |
-| `Config.paper_synthetic()` | the synthetic grid and the tutorial | one segment, one chunking of 32 chunks, three coordinates, 50 neighbours for the refinement |
+| `chunkings` | `((10,), (20,), (40,))` | Give the number of chunks in each detector segment, for each chunking, from wide chunks to narrow chunks. For three segments, an example is `((4, 4, 3), (8, 7, 5), (16, 14, 10))`. |
+| `continuum` | `"none"` | Set `"running"` if the spectra keep their instrumental response. Then also give `err`. |
+| `error_weights` | `False` | Set `True` if the errors have a structure of their own, for example from sky lines or detector features. Keep `False` if the errors follow the photon noise: in the paper, the weights made all the results worse on such spectra. |
+| `d` | `4` | Set the number of coordinates. Use `Fit.eigenvalues` to select it. |
+| `n_landmarks`, `search` | `None`, `"exact"` | For more than a few tens of thousands of stars, set `n_landmarks=800` and `search="nndescent"`. |
 
-The fields that matter most when adapting the method to a new survey are `chunkings` (the wavelength chunks per detector segment, coarse to fine), `continuum` (`"none"` for spectra that arrive normalised, `"running"` for spectra with their response), `error_weights` (weight each pixel's absorption by its inverse variance; off by default, because it helps where the errors carry sky and detector structure, as in DESI, and hurts where they follow the photon noise, as in APOGEE), `d` (the number of coordinates; read it from `Fit.eigenvalues`), and `search` (`"exact"` up to a few tens of thousands of stars, `"nndescent"` beyond). A configuration can be saved to and loaded from JSON with `Config.save` and `Config.load`.
+`Config.save` and `Config.load` write and read a configuration as JSON.
 
 ## Input format
 
 `fit(flux, good, segments, config, err=None)`:
 
-- `flux`: `[N, P]` float, the spectra on a common wavelength grid, continuum-normalised unless `continuum="running"`;
-- `good`: `[N, P]` bool, False on bad pixels (they take no part in any fit and carry no absorption);
-- `segments`: `[P]` int, the detector segment of every pixel, numbered from 0, so that chunks never straddle a gap;
-- `err`: `[N, P]` float, the pixel standard deviations; provide these for `continuum="running"` or `error_weights=True`. If omitted, the code uses an array of ones.
+- `flux`: `[N, P]` float. The spectra on one wavelength grid. If `continuum="none"`, the spectra must be continuum-normalised.
+- `good`: `[N, P]` bool. False on a bad pixel. A bad pixel is not used in a fit and has no absorption.
+- `segments`: `[P]` int. The detector segment of each pixel, from 0. A chunk does not cross the gap between two segments.
+- `err`: `[N, P]` float. The standard deviation of each pixel. Give `err` for `continuum="running"` or `error_weights=True`. If you do not give `err`, `fit` uses an array of ones.
 
-Labels for `Fit.propagate` are an `[N, L]` array (rows for every star of the fit, any values on the unlabelled rows) with `labelled_index` naming the rows whose values are known.
+`Fit.propagate` uses an `[N, L]` array of labels, with one row for each star of the fit. `labelled_index` gives the rows with known labels. The values in the other rows are not used.
 
-Training indices must be unique and in range, their labels finite, and every connected component of the propagation weights must contain a training star. Invalid training sets raise `ValueError`; refinement or transfer that fails to converge raises `RuntimeError`.
+To select the stars to label, use `armillary.labels.density_draw(F.C, n)`. This function selects `n` stars as the paper does, with more stars in the sparse regions of the coordinates. Use `candidates` to select only from the stars that you can get labels for.
+
+The indices of the labelled stars must be unique and in the range of the rows, and their labels must be finite. Each connected component of the weights must contain a labelled star. If the labelled stars are not valid, the functions raise `ValueError`. If the refinement or the transfer does not converge, the functions raise `RuntimeError`.
 
 ## Tests
 
 ```bash
 python -m pytest tests -m "not slow"         # the fast tests, a few seconds
-ARMILLARY_APOGEE_CUBE=/path/to/apogee_cube.npz python -m pytest tests -m slow   # nn-descent against the exact search on the paper's APOGEE test cube
+python -m pytest tests -m slow                # nearest-neighbour descent against the exact search, about 30 seconds
 ```
 
-They check the feature vectors against the pixel-level integral of the distance, landmark scaling against classical multidimensional scaling, the conjugate-gradient refinement and transfer against dense solves, that bridging makes the graph connected, and the nearest-neighbour descent against the exact search.
+The tests compare the feature vectors with the distance added pixel by pixel. They compare landmark scaling with classical multidimensional scaling, and the conjugate-gradient refinement and transfer with dense solves. They also make sure that the bridges connect the graph, and that the density draw selects more stars in sparse regions. The slow test compares nearest-neighbour descent with the exact search on all the tutorial spectra.
 
 ## Citation
 
-If you use Armillary, please cite Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*.
+If you use Armillary, cite Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*.
 
 ## Licence
 
-MIT, see `LICENSE`.
+MIT. See `LICENSE`.

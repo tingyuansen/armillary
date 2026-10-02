@@ -6,4 +6,4 @@ build/
 dist/
 .ipynb_checkpoints/
 .DS_Store
-examples/output/
+examples/output_grid_fit.npz

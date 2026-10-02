@@ -1,4 +1,4 @@
-"""Landmark MDS with every star a landmark equals classical MDS on the full geodesic table."""
+"""Landmark multidimensional scaling against classical multidimensional scaling on the full geodesic table."""
 import numpy as np
 from scipy.sparse.csgraph import dijkstra
 from armillary import coordinates as cm, lattice as lm, distance as dm
@@ -10,6 +10,7 @@ def _graph(n=400, seed=0):
 
 
 def test_all_landmarks_equals_classical():
+    """With every star a landmark, the landmark formula must reproduce classical MDS exactly: the same eigenvalues, the same coordinates up to the sign of each axis, and the same inner products."""
     G = _graph(); N = G.shape[0]; Dg = dijkstra(G, directed=False)
     C_ref, ev_ref = cm.classical_mds(Dg, d=3, n_eig=10)
     C_lm, ev_lm = cm.landmark_mds(lm.geodesics(G, np.arange(N)), np.arange(N), d=3, n_eig=10)
@@ -19,6 +20,7 @@ def test_all_landmarks_equals_classical():
 
 
 def test_few_landmarks_are_close():
+    """With 80 landmarks out of 400 stars, the pairwise distances of the coordinates must still correlate with the classical ones above 0.99."""
     G = _graph(); N = G.shape[0]; Dg = dijkstra(G, directed=False); C_ref, _ = cm.classical_mds(Dg, d=3)
     lmk = np.random.default_rng(0).permutation(N)[:80]
     C_lm, _ = cm.landmark_mds(lm.geodesics(G, lmk), lmk, d=3)

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "armillary"
-version = "0.2.0"
-description = "Coordinates for a spectroscopic survey from the spectra alone, and labels for every star from a few labelled ones"
+version = "0.3.0"
+description = "Coordinates for a set of stellar spectra from the spectra alone, and labels for all the stars from a few labelled stars"
 readme = "README.md"
 license = {file = "LICENSE"}
 authors = [{name = "Yuan-Sen Ting"}]
@@ -24,4 +24,4 @@ packages = ["armillary"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: needs the paper's APOGEE test cube (ARMILLARY_APOGEE_CUBE) and a few minutes"]
+markers = ["slow: nearest-neighbour descent against the exact search on all the tutorial spectra, about 30 seconds"]

@@ -1,4 +1,4 @@
-"""Bridging makes the lattice connected; the neighbour lists are what the graph is built from."""
+"""The neighbour graph: bridging makes it connected, its edges carry D, and zero distances survive."""
 import numpy as np
 import pytest
 from scipy.sparse.csgraph import connected_components
@@ -6,6 +6,7 @@ from armillary import lattice as lm, distance as dm
 
 
 def test_bridging_connects_pieces():
+    """Three well-separated clouds give three pieces; two bridges must join them to the largest, each bridge the shortest edge to it, and the graph must be symmetric and fully reachable."""
     r = np.random.default_rng(0); A = r.normal(size=(200, 6)); B = r.normal(size=(150, 6)) + 40; C = r.normal(size=(60, 6)) - 40
     X = np.vstack([A, B, C]).astype(np.float32); nbr, dist = dm.pairwise(X, k=8)
     G, info = lm.lattice(nbr, dist, X)
@@ -19,6 +20,7 @@ def test_bridging_connects_pieces():
 
 
 def test_edge_weights_are_D():
+    """Every edge of the graph must carry the distance of its neighbour pair."""
     X = np.random.default_rng(2).normal(size=(120, 5)).astype(np.float32); nbr, dist = dm.pairwise(X, k=5)
     G, _ = lm.lattice(nbr, dist, X)
     for i in range(120):
@@ -26,6 +28,7 @@ def test_edge_weights_are_D():
 
 
 def test_identical_spectra_remain_connected_at_zero_distance():
+    """Identical spectra are at distance zero; the sparse assembly must keep those zero edges, so the graph stays connected and the geodesics are zero."""
     X = np.zeros((4, 2), dtype=np.float32)
     nbr, dist = lm.neighbours(X, k=1)
     G, info = lm.lattice(nbr, dist, X)
@@ -35,6 +38,7 @@ def test_identical_spectra_remain_connected_at_zero_distance():
 
 
 def test_zero_cost_bridge_joins_disconnected_identical_spectra():
+    """A bridge of length zero between two pieces must survive the assembly as well."""
     X = np.zeros((4, 2), dtype=np.float32)
     nbr = np.array([[1], [0], [3], [2]])
     G, info = lm.lattice(nbr, np.zeros((4, 1), dtype=np.float32), X)
@@ -45,6 +49,7 @@ def test_zero_cost_bridge_joins_disconnected_identical_spectra():
 
 
 def test_zero_edges_preserve_mixed_distance_paths():
+    """A path through a zero edge and a nonzero edge must have the length of the nonzero edge."""
     X = np.array([[0], [0], [2]], dtype=np.float32)
     nbr, dist = lm.neighbours(X, k=1)
     G, _ = lm.lattice(nbr, dist, X)
@@ -54,5 +59,6 @@ def test_zero_edges_preserve_mixed_distance_paths():
 @pytest.mark.parametrize("k", [0, -1, 3, 1.5])
 @pytest.mark.parametrize("search", ["exact", "nndescent"])
 def test_invalid_neighbour_count_fails_before_search(k, search):
+    """An invalid k must raise before either search starts."""
     with pytest.raises(ValueError, match="positive integer"):
         lm.neighbours(np.zeros((3, 2), dtype=np.float32), k, search=search)
