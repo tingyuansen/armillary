@@ -129,7 +129,19 @@ The tests compare the feature vectors with the distance added pixel by pixel. Th
 
 ## Citation
 
-If you use Armillary, cite Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*.
+If you use Armillary, please cite the paper:
+
+```bibtex
+@article{ting2026armillary,
+  author        = {Ting, Yuan-Sen and Saad, Serat},
+  title         = {{Armillary}: A Label-Free Coordinate System for Stellar Spectra},
+  journal       = {arXiv e-prints},
+  year          = {2026},
+  eprint        = {xxxx.xxxxx},
+  archivePrefix = {arXiv},
+  primaryClass  = {astro-ph.SR}
+}
+```
 
 ## Licence
 
