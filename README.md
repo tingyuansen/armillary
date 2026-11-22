@@ -4,7 +4,7 @@ Armillary makes a coordinate system for a set of stellar spectra from the spectr
 
 The method uses no model spectra and no training set to put the stars in the coordinates. Labels are necessary only for the last step. In the paper, a few dozen labelled stars give the main stellar-parameter structure of a sample of hundreds of thousands of stars.
 
-Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*, gives the method. This repository contains the package and a tutorial on synthetic spectra.
+Ting & Saad (2026), *Armillary: a label-free coordinate system for stellar spectra*, gives the method. This repository contains the package, a tutorial on synthetic spectra and the data products of the paper.
 
 ![The seven steps of Armillary](examples/armillary_schematic.png)
 
@@ -85,6 +85,10 @@ The tutorial shows these items:
 
 The tutorial runs in two to three minutes on a laptop. `examples/tutorial_figures.py` makes the figures, and `examples/figure_style.py` sets their style.
 
+## The data of the paper
+
+The folder [`data/`](data/) holds the data products of the paper. These are the coordinates of the 202,932 APOGEE stars and the 104,799 DESI stars, the training sets, and the labels transferred from each training set. The folder also holds the other representations of Figure 5, the errors of Figure 8 and the synthetic grid of Figure 3. [`data/README.md`](data/README.md) describes every column. The tables take about 120 MB, and the package does not need them.
+
 ## Configuration
 
 `Config` holds all the parameters of the method, and `armillary/pipeline.py` describes each field. The defaults of the method settings are the values of the paper. The default `chunkings`, `n_landmarks` and `search` are a starting point: change them for your data. For a fixed configuration, Armillary uses no labels to make the coordinates.
@@ -129,20 +133,26 @@ The tests compare the feature vectors with the distance added pixel by pixel. Th
 
 ## Citation
 
-If you use Armillary, please cite the paper:
+If you use Armillary or its data, please cite the paper:
 
 ```bibtex
-@article{ting2026armillary,
-  author        = {Ting, Yuan-Sen and Saad, Serat},
-  title         = {{Armillary}: A Label-Free Coordinate System for Stellar Spectra},
-  journal       = {arXiv e-prints},
-  year          = {2026},
-  eprint        = {xxxx.xxxxx},
-  archivePrefix = {arXiv},
-  primaryClass  = {astro-ph.SR}
+@ARTICLE{2026arXiv261007112T,
+       author = {{Ting}, Yuan-Sen and {Saad}, Serat},
+        title = "{Armillary: A Label-Free Coordinate System for Stellar Spectra}",
+      journal = {arXiv e-prints},
+         year = 2026,
+        month = oct,
+          eid = {arXiv:2610.07112},
+        pages = {arXiv:2610.07112},
+          doi = {10.48550/arXiv.2610.07112},
+archivePrefix = {arXiv},
+       eprint = {2610.07112},
+ primaryClass = {astro-ph.IM},
+       adsurl = {https://scixplorer.org/abs/2026arXiv261007112T},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 ```
 
 ## Licence
 
-MIT. See `LICENSE`.
+MIT. See `LICENSE`. The data in `data/` are under the same licence.

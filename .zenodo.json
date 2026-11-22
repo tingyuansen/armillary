@@ -1,0 +1,15 @@
+{
+  "title": "Armillary: a label-free coordinate system for stellar spectra (code and data)",
+  "upload_type": "software",
+  "description": "<p>Armillary makes a coordinate system for a set of stellar spectra from the spectra alone, and transfers labels from a few labelled stars to all the other stars through the same neighbour graph. This record holds the Python package, a tutorial on synthetic spectra, and the data products of Ting &amp; Saad (2026): the coordinates of 202,932 APOGEE DR17 stars and 104,799 DESI DR1 stars, the training sets, and the labels transferred from each training set. data/README.md describes every table.</p>",
+  "creators": [
+    {"name": "Ting, Yuan-Sen", "orcid": "0000-0001-5082-9536", "affiliation": "The Ohio State University"},
+    {"name": "Saad, Serat", "orcid": "0009-0004-9592-2311", "affiliation": "The Ohio State University"}
+  ],
+  "license": "MIT",
+  "keywords": ["stellar spectroscopy", "manifold learning", "optimal transport", "semi-supervised learning"],
+  "related_identifiers": [
+    {"identifier": "10.48550/arXiv.2610.07112", "relation": "isSupplementTo", "resource_type": "publication-article", "scheme": "doi"}
+  ],
+  "communities": [{"identifier": "aas"}]
+}
